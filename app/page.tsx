@@ -1,6 +1,23 @@
 "use client";
 
+import { useState } from "react";
+
 export default function HomePage() {
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+
+  function handleSearch() {
+    // Sau này:
+    // - Nếu city / district có giá trị → dùng trực tiếp
+    // - Nếu chưa có → parse từ address hoặc Google Places
+    console.log({
+      address,
+      city,
+      district,
+    });
+  }
+
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex items-center justify-center px-4">
       <div className="w-full max-w-3xl bg-white rounded-2xl shadow-md p-8">
@@ -10,7 +27,7 @@ export default function HomePage() {
             TRA CỨU CÔNG TY
           </h1>
           <p className="text-gray-500 mt-2">
-            Nhập địa chỉ để tra cứu công ty theo khu vực
+            Nhập thông tin để tra cứu công ty
           </p>
         </div>
 
@@ -23,8 +40,11 @@ export default function HomePage() {
             </label>
             <input
               type="text"
-              placeholder="VD: S202 Vinhomes Smart City, Nam Từ Liêm, Hà Nội"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="VD: Liền kề C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
+              className="w-full rounded-lg border border-gray-300 px-4 py-3
+                focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
@@ -35,9 +55,11 @@ export default function HomePage() {
             </label>
             <input
               type="text"
-              placeholder="Tự động nhận diện"
-              disabled
-              className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-3 text-gray-500"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Tự động nhận diện hoặc nhập tay"
+              className="w-full rounded-lg border border-gray-300 px-4 py-3
+                focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
@@ -48,9 +70,11 @@ export default function HomePage() {
             </label>
             <input
               type="text"
-              placeholder="Tự động nhận diện"
-              disabled
-              className="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-3 text-gray-500"
+              value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+              placeholder="Tự động nhận diện hoặc nhập tay"
+              className="w-full rounded-lg border border-gray-300 px-4 py-3
+                focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
@@ -59,16 +83,17 @@ export default function HomePage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Kết quả công ty
             </label>
-
             <div className="rounded-lg border border-dashed border-gray-300 p-4 text-gray-500 text-sm">
-              Chưa có dữ liệu. Vui lòng nhập địa chỉ để tra cứu.
+              Chưa có dữ liệu. Vui lòng tra cứu.
             </div>
           </div>
 
           {/* BUTTON */}
           <div className="pt-4 flex justify-center">
             <button
-              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg transition"
+              onClick={handleSearch}
+              className="bg-orange-500 hover:bg-orange-600
+                text-white font-semibold px-8 py-3 rounded-lg transition"
             >
               Tra cứu
             </button>
