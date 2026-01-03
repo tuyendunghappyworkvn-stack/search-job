@@ -14,7 +14,6 @@ function parseAddressVN(address: string) {
   let district = "";
 
   for (const part of parts) {
-    // Thành phố
     if (
       part.includes("hà nội") ||
       part.includes("hồ chí minh") ||
@@ -25,7 +24,6 @@ function parseAddressVN(address: string) {
       city = part;
     }
 
-    // Quận / Huyện
     if (
       part.includes("quận") ||
       part.includes("huyện") ||
@@ -37,10 +35,7 @@ function parseAddressVN(address: string) {
     }
   }
 
-  return {
-    city,
-    district,
-  };
+  return { city, district };
 }
 
 export default function HomePage() {
@@ -48,26 +43,29 @@ export default function HomePage() {
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
 
-  function handleSearch() {
-    let finalCity = city;
-    let finalDistrict = district;
+  /* =========================
+     HANDLE ADDRESS CHANGE
+  ========================= */
+  function handleAddressChange(value: string) {
+    setAddress(value);
 
-    // Nếu user chưa nhập tay thì parse từ địa chỉ
-    if ((!city || !district) && address) {
-      const parsed = parseAddressVN(address);
+    const parsed = parseAddressVN(value);
 
-      finalCity = city || parsed.city;
-      finalDistrict = district || parsed.district;
-
-      setCity(finalCity);
-      setDistrict(finalDistrict);
+    // chỉ auto fill nếu user CHƯA nhập tay
+    if (!city && parsed.city) {
+      setCity(parsed.city);
     }
 
-    // 👉 Sau bước này dùng finalCity + finalDistrict để search LarkBase
+    if (!district && parsed.district) {
+      setDistrict(parsed.district);
+    }
+  }
+
+  function handleSearch() {
     console.log("SEARCH WITH:", {
       address,
-      city: finalCity,
-      district: finalDistrict,
+      city,
+      district,
     });
   }
 
@@ -94,8 +92,8 @@ export default function HomePage() {
             <input
               type="text"
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="VD: Liền kề C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
+              onChange={(e) => handleAddressChange(e.target.value)}
+              placeholder="VD: C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
                 focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
