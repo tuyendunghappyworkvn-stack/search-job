@@ -2,19 +2,72 @@
 
 import { useState } from "react";
 
+/* =========================
+   PARSE ĐỊA CHỈ VIỆT NAM
+========================= */
+function parseAddressVN(address: string) {
+  if (!address) return { city: "", district: "" };
+
+  const parts = address.split(",").map((p) => p.trim().toLowerCase());
+
+  let city = "";
+  let district = "";
+
+  for (const part of parts) {
+    // Thành phố
+    if (
+      part.includes("hà nội") ||
+      part.includes("hồ chí minh") ||
+      part.includes("tp.") ||
+      part.includes("đà nẵng") ||
+      part.includes("cần thơ")
+    ) {
+      city = part;
+    }
+
+    // Quận / Huyện
+    if (
+      part.includes("quận") ||
+      part.includes("huyện") ||
+      part.includes("thị xã") ||
+      part.includes("nam từ liêm") ||
+      part.includes("bắc từ liêm")
+    ) {
+      district = part;
+    }
+  }
+
+  return {
+    city,
+    district,
+  };
+}
+
 export default function HomePage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
 
   function handleSearch() {
-    // Sau này:
-    // - Nếu city / district có giá trị → dùng trực tiếp
-    // - Nếu chưa có → parse từ address hoặc Google Places
-    console.log({
+    let finalCity = city;
+    let finalDistrict = district;
+
+    // Nếu user chưa nhập tay thì parse từ địa chỉ
+    if ((!city || !district) && address) {
+      const parsed = parseAddressVN(address);
+
+      finalCity = city || parsed.city;
+      finalDistrict = district || parsed.district;
+
+      setCity(finalCity);
+      setDistrict(finalDistrict);
+    }
+
+    // 👉 Sau bước này dùng finalCity + finalDistrict để search LarkBase
+    console.log("SEARCH WITH:", {
       address,
-      city,
-      district,
+      city: finalCity,
+      district: finalDistrict,
     });
   }
 
