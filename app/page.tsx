@@ -3,6 +3,40 @@
 import { useState } from "react";
 
 /* =========================
+   FORMAT ĐỊA DANH VIỆT NAM
+   (viết hoa đúng sau khi user nhập)
+========================= */
+function formatVietnameseLocation(str: string) {
+  if (!str) return "";
+
+  let text = str
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+
+  // Viết hoa từng tiếng
+  text = text
+    .split(" ")
+    .map(
+      (word) => word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ");
+
+  // Chuẩn hoá các tiền tố hành chính phổ biến
+  text = text
+    .replace(/^Tp\.?\s?/i, "Thành phố ")
+    .replace(/^Tp\s?/i, "Thành phố ")
+    .replace(/^Hcm$/i, "Thành phố Hồ Chí Minh")
+    .replace(/^Tphcm$/i, "Thành phố Hồ Chí Minh")
+    .replace(/^Hà Nội$/i, "Hà Nội")
+    .replace(/^Quận\s*/i, "Quận ")
+    .replace(/^Huyện\s*/i, "Huyện ")
+    .replace(/^Thị Xã\s*/i, "Thị xã ");
+
+  return text;
+}
+
+/* =========================
    PARSE ĐỊA CHỈ VIỆT NAM
 ========================= */
 function parseAddressVN(address: string) {
@@ -53,11 +87,11 @@ export default function HomePage() {
 
     // chỉ auto fill nếu user CHƯA nhập tay
     if (!city && parsed.city) {
-      setCity(parsed.city);
+      setCity(formatVietnameseLocation(parsed.city));
     }
 
     if (!district && parsed.district) {
-      setDistrict(parsed.district);
+      setDistrict(formatVietnameseLocation(parsed.district));
     }
   }
 
@@ -93,6 +127,9 @@ export default function HomePage() {
               type="text"
               value={address}
               onChange={(e) => handleAddressChange(e.target.value)}
+              onBlur={() =>
+                setAddress(formatVietnameseLocation(address))
+              }
               placeholder="VD: C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
                 focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -108,13 +145,16 @@ export default function HomePage() {
               type="text"
               value={city}
               onChange={(e) => setCity(e.target.value)}
+              onBlur={() =>
+                setCity(formatVietnameseLocation(city))
+              }
               placeholder="Tự động nhận diện hoặc nhập tay"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
                 focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
-          {/* QUẬN */}
+          {/* QUẬN / HUYỆN */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Quận / Huyện
@@ -123,6 +163,9 @@ export default function HomePage() {
               type="text"
               value={district}
               onChange={(e) => setDistrict(e.target.value)}
+              onBlur={() =>
+                setDistrict(formatVietnameseLocation(district))
+              }
               placeholder="Tự động nhận diện hoặc nhập tay"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
                 focus:outline-none focus:ring-2 focus:ring-orange-400"
