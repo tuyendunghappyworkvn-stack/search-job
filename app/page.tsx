@@ -56,14 +56,27 @@ function parseAddressVN(address: string) {
   return { city, district };
 }
 
+type DistanceResult = {
+  name: string;
+  km: number;
+};
+
+type SameDistrictResult = {
+  name: string;
+};
+
 export default function HomePage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
 
-  // 👉 FLAG: user có nhập tay hay chưa
   const [cityTouched, setCityTouched] = useState(false);
   const [districtTouched, setDistrictTouched] = useState(false);
+
+  // 👉 KẾT QUẢ
+  const [distanceResults, setDistanceResults] = useState<DistanceResult[]>([]);
+  const [sameDistrictResults, setSameDistrictResults] = useState<SameDistrictResult[]>([]);
+  const [loading, setLoading] = useState(false);
 
   /* =========================
      HANDLE ADDRESS CHANGE
@@ -71,7 +84,6 @@ export default function HomePage() {
   function handleAddressChange(value: string) {
     setAddress(value);
 
-    // Nếu user xóa hết địa chỉ → reset auto state
     if (!value.trim()) {
       if (!cityTouched) setCity("");
       if (!districtTouched) setDistrict("");
@@ -89,12 +101,34 @@ export default function HomePage() {
     }
   }
 
-  function handleSearch() {
-    console.log("SEARCH WITH:", {
-      address,
-      city,
-      district,
-    });
+  /* =========================
+     SEARCH
+  ========================= */
+  async function handleSearch() {
+    setLoading(true);
+    setDistanceResults([]);
+    setSameDistrictResults([]);
+
+    try {
+      const res = await fetch("/api/search-company", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address,
+          city,
+          district,
+        }),
+      });
+
+      const data = await res.json();
+
+      setDistanceResults(data.distance || []);
+      setSameDistrictResults(data.sameDistrict || []);
+    } catch (err) {
+      console.error("SEARCH ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -167,26 +201,52 @@ export default function HomePage() {
             />
           </div>
 
-          {/* KẾT QUẢ */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Kết quả công ty
-            </label>
-            <div className="rounded-lg border border-dashed border-gray-300 p-4 text-gray-500 text-sm">
-              Chưa có dữ liệu. Vui lòng tra cứu.
-            </div>
-          </div>
-
           {/* BUTTON */}
-          <div className="pt-4 flex justify-center">
+          <div className="pt-2 flex justify-center">
             <button
               onClick={handleSearch}
+              disabled={loading}
               className="bg-orange-500 hover:bg-orange-600
-                text-white font-semibold px-8 py-3 rounded-lg transition"
+                text-white font-semibold px-8 py-3 rounded-lg transition disabled:opacity-60"
             >
-              Tra cứu
+              {loading ? "Đang tra cứu..." : "Tra cứu"}
             </button>
           </div>
+
+          {/* ===== KẾT QUẢ ===== */}
+          {(distanceResults.length > 0 || sameDistrictResults.length > 0) && (
+            <div className="pt-6 space-y-6">
+              {/* Ô 1: KHOẢNG CÁCH */}
+              {distanceResults.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    Khoảng cách
+                  </h3>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    {distanceResults.map((item, idx) => (
+                      <div key={idx}>
+                        {item.name} – {item.km} km
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ô 2: CÙNG QUẬN */}
+              {sameDistrictResults.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    Cùng Quận
+                  </h3>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    {sameDistrictResults.map((item, idx) => (
+                      <div key={idx}>{item.name}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
