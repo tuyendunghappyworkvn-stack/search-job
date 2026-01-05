@@ -4,36 +4,19 @@ import { useState } from "react";
 
 /* =========================
    FORMAT ĐỊA DANH VIỆT NAM
-   (viết hoa đúng sau khi user nhập)
 ========================= */
 function formatVietnameseLocation(str: string) {
   if (!str) return "";
 
-  let text = str
+  return str
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, " ");
-
-  // Viết hoa từng tiếng
-  text = text
+    .replace(/\s+/g, " ")
     .split(" ")
     .map(
       (word) => word.charAt(0).toUpperCase() + word.slice(1)
     )
     .join(" ");
-
-  // Chuẩn hoá các tiền tố hành chính phổ biến
-  text = text
-    .replace(/^Tp\.?\s?/i, "Thành phố ")
-    .replace(/^Tp\s?/i, "Thành phố ")
-    .replace(/^Hcm$/i, "Thành phố Hồ Chí Minh")
-    .replace(/^Tphcm$/i, "Thành phố Hồ Chí Minh")
-    .replace(/^Hà Nội$/i, "Hà Nội")
-    .replace(/^Quận\s*/i, "Quận ")
-    .replace(/^Huyện\s*/i, "Huyện ")
-    .replace(/^Thị Xã\s*/i, "Thị xã ");
-
-  return text;
 }
 
 /* =========================
@@ -63,7 +46,8 @@ function parseAddressVN(address: string) {
       part.includes("huyện") ||
       part.includes("thị xã") ||
       part.includes("nam từ liêm") ||
-      part.includes("bắc từ liêm")
+      part.includes("bắc từ liêm") ||
+      part.includes("thanh xuân")
     ) {
       district = part;
     }
@@ -77,20 +61,30 @@ export default function HomePage() {
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
 
+  // 👉 FLAG: user có nhập tay hay chưa
+  const [cityTouched, setCityTouched] = useState(false);
+  const [districtTouched, setDistrictTouched] = useState(false);
+
   /* =========================
      HANDLE ADDRESS CHANGE
   ========================= */
   function handleAddressChange(value: string) {
     setAddress(value);
 
+    // Nếu user xóa hết địa chỉ → reset auto state
+    if (!value.trim()) {
+      if (!cityTouched) setCity("");
+      if (!districtTouched) setDistrict("");
+      return;
+    }
+
     const parsed = parseAddressVN(value);
 
-    // chỉ auto fill nếu user CHƯA nhập tay
-    if (!city && parsed.city) {
+    if (!cityTouched && parsed.city) {
       setCity(formatVietnameseLocation(parsed.city));
     }
 
-    if (!district && parsed.district) {
+    if (!districtTouched && parsed.district) {
       setDistrict(formatVietnameseLocation(parsed.district));
     }
   }
@@ -127,9 +121,6 @@ export default function HomePage() {
               type="text"
               value={address}
               onChange={(e) => handleAddressChange(e.target.value)}
-              onBlur={() =>
-                setAddress(formatVietnameseLocation(address))
-              }
               placeholder="VD: C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
                 focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -144,10 +135,11 @@ export default function HomePage() {
             <input
               type="text"
               value={city}
-              onChange={(e) => setCity(e.target.value)}
-              onBlur={() =>
-                setCity(formatVietnameseLocation(city))
-              }
+              onChange={(e) => {
+                setCity(e.target.value);
+                setCityTouched(true);
+              }}
+              onBlur={() => setCity(formatVietnameseLocation(city))}
               placeholder="Tự động nhận diện hoặc nhập tay"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
                 focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -162,7 +154,10 @@ export default function HomePage() {
             <input
               type="text"
               value={district}
-              onChange={(e) => setDistrict(e.target.value)}
+              onChange={(e) => {
+                setDistrict(e.target.value);
+                setDistrictTouched(true);
+              }}
               onBlur={() =>
                 setDistrict(formatVietnameseLocation(district))
               }
