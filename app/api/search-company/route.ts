@@ -28,7 +28,7 @@ async function getTenantToken() {
 }
 
 /* =========================
-   GET ALL RECORDS
+   GET ALL RECORDS (PAGINATION)
 ========================= */
 async function getAllRecords(token: string) {
   let all: any[] = [];
@@ -54,27 +54,15 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   HELPER: GET LOOKUP TEXT
+   HELPER: LOOKUP TEXT
 ========================= */
-function getLookupText(val: any): string {
-  if (!val) return "";
-
-  // case: [{ text: "Hà Nội" }]
-  if (Array.isArray(val)) {
-    return val.map((v) => v?.text || v).join(" ");
-  }
-
-  // case: { text: "Hà Nội" }
-  if (typeof val === "object") {
-    return val.text || "";
-  }
-
-  // case: "Hà Nội"
-  return String(val);
+function lookupText(field: any): string {
+  if (!Array.isArray(field)) return "";
+  return field.map((v) => v.text).join(" ").toLowerCase();
 }
 
 /* =========================
-   SEARCH
+   POST
 ========================= */
 export async function POST(req: Request) {
   try {
@@ -83,28 +71,28 @@ export async function POST(req: Request) {
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const cityLower = city.toLowerCase();
-    const districtLower = district.toLowerCase();
+    const cityNeedle = city?.toLowerCase();
+    const districtNeedle = district?.toLowerCase();
 
-    const matched = records.filter((r) => {
-      const fields = r.fields || {};
+    const companies = records
+      .filter((r) => {
+        const fields = r.fields || {};
 
-      const cityText = getLookupText(fields["Thành phố"]).toLowerCase();
-      const districtText = getLookupText(fields["Quận"]).toLowerCase();
+        const cityText = lookupText(fields["Thành phố"]);
+        const districtText = lookupText(fields["Quận"]);
 
-      return (
-        cityText.includes(cityLower) &&
-        districtText.includes(districtLower)
-      );
-    });
-
-    const companies = matched.map((r) => ({
-      company: r.fields["Công ty"],
-      job: r.fields["Công việc"],
-      address: r.fields["Địa chỉ"],
-      city: getLookupText(r.fields["Thành phố"]),
-      district: getLookupText(r.fields["Quận"]),
-    }));
+        return (
+          cityText.includes(cityNeedle) &&
+          districtText.includes(districtNeedle)
+        );
+      })
+      .map((r) => ({
+        company: r.fields["Công ty"],
+        job: r.fields["Công việc"],
+        address: r.fields["Địa chỉ"],
+        city: lookupText(r.fields["Thành phố"]),
+        district: lookupText(r.fields["Quận"]),
+      }));
 
     return NextResponse.json({
       total: companies.length,
