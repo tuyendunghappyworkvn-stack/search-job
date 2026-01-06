@@ -11,7 +11,7 @@ const BASE_ID = process.env.LARK_BASE_ID!;
 const TABLE_ID = process.env.LARK_TABLE_ID!;
 
 /* =========================
-   GET TOKEN
+   GET TENANT TOKEN
 ========================= */
 async function getTenantToken() {
   const res = await fetch(
@@ -28,33 +28,24 @@ async function getTenantToken() {
 
   const data = await res.json();
   if (!data?.tenant_access_token) {
-    throw new Error("Cannot get tenant token");
+    throw new Error("Cannot get tenant access token");
   }
 
   return data.tenant_access_token;
 }
 
 /* =========================
-   NORMALIZE LARK FIELD
-========================= */
-function getText(field: any): string {
-  if (!field) return "";
-  if (typeof field === "object") return field.text || "";
-  return String(field);
-}
-
-/* =========================
-   LOAD ALL RECORDS
+   GET ALL RECORDS (PAGINATION)
 ========================= */
 async function getAllRecords(token: string) {
-  let all: any[] = [];
+  let records: any[] = [];
   let pageToken: string | undefined;
 
   do {
     const url = new URL(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records`
     );
-    url.searchParams.set("page_size", "100");
+    url.searchParams.set("page_size", "500");
     if (pageToken) url.searchParams.set("page_token", pageToken);
 
     const res = await fetch(url.toString(), {
@@ -62,54 +53,83 @@ async function getAllRecords(token: string) {
     });
 
     const data = await res.json();
-    all = all.concat(data?.data?.items || []);
+    records = records.concat(data?.data?.items || []);
     pageToken = data?.data?.page_token;
   } while (pageToken);
 
-  return all;
+  return records;
 }
 
 /* =========================
-   POST SEARCH
+   OPTION → TEXT (CỰC QUAN TRỌNG)
+========================= */
+function getOptionText(value: any): string {
+  if (!value) return "";
+
+  if (typeof value === "string") return value;
+
+  if (Array.isArray(value)) {
+    return value.map((v) => v.text).join(" ");
+  }
+
+  if (typeof value === "object" && value.text) {
+    return value.text;
+  }
+
+  return "";
+}
+
+/* =========================
+   POST: SEARCH COMPANY
 ========================= */
 export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
 
-    const cityInput = city?.trim();
-    const districtInput = district?.trim();
-
-    if (!cityInput || !districtInput) {
-      return NextResponse.json({ total: 0, companies: [] });
+    if (!city || !district) {
+      return NextResponse.json(
+        { total: 0, companies: [] },
+        { status: 200 }
+      );
     }
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const result = records.filter((r) => {
-      const fields = r.fields || {};
+    const cityInput = city.trim();
+    const districtInput = district.trim();
 
-      const cityText = getText(fields["Thành phố"]);
-      const districtText = getText(fields["Quận"]);
-      const jobType = getText(fields["Loại công việc"]);
+    const companies = records
+      .filter((item) => {
+        const fields = item.fields || {};
 
-      return (
-        cityText === cityInput &&
-        districtText === `Quận ${districtInput}` &&
-        jobType.includes("POD")
-      );
-    });
+        const cityText = getOptionText(fields["Thành phố"]);
+        const districtText = getOptionText(fields["Quận"]);
+
+        if (!cityText || !districtText) return false;
+
+        const matchCity = cityText === cityInput;
+
+        const matchDistrict =
+          districtText === districtInput ||
+          districtText.replace("Quận ", "") === districtInput;
+
+        return matchCity && matchDistrict;
+      })
+      .map((item) => {
+        const f = item.fields || {};
+        return {
+          company: f["Công ty"] || "",
+          job: f["Công việc"] || "",
+          address: f["Địa chỉ"] || "",
+          city: getOptionText(f["Thành phố"]),
+          district: getOptionText(f["Quận"]),
+        };
+      });
 
     return NextResponse.json({
-      total: result.length,
-      companies: result.map((r) => ({
-        company: r.fields["Công ty"],
-        job: r.fields["Công việc"],
-        address: r.fields["Địa chỉ"],
-        city: getText(r.fields["Thành phố"]),
-        district: getText(r.fields["Quận"]),
-        jobType: getText(r.fields["Loại công việc"]),
-      })),
+      total: companies.length,
+      companies,
     });
   } catch (err: any) {
     console.error("SEARCH ERROR:", err);
