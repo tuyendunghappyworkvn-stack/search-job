@@ -30,28 +30,9 @@ async function getTenantToken() {
   if (!data?.tenant_access_token) {
     throw new Error("Cannot get tenant access token");
   }
+
   return data.tenant_access_token;
 }
-
-/* =========================
-   NORMALIZE TEXT
-========================= */
-function normalize(str: string) {
-  return str
-    .toLowerCase()
-    .replace(/^quận\s+/i, "")
-    .replace(/^huyện\s+/i, "")
-    .trim();
-}
-
-/* =========================
-   ALLOWED JOB GROUPS
-========================= */
-const ALLOWED_JOB_GROUPS = [
-  "pod",
-  "dropship",
-  "pod/dropship",
-];
 
 /* =========================
    POST: SEARCH COMPANY
@@ -62,14 +43,16 @@ export async function POST(req: Request) {
 
     if (!city || !district) {
       return NextResponse.json(
-        { error: "Thiếu thông tin thành phố hoặc quận" },
+        { error: "Thiếu thành phố hoặc quận" },
         { status: 400 }
       );
     }
 
     const token = await getTenantToken();
 
-    /* ===== 1. SEARCH THEO THÀNH PHỐ ===== */
+    /* =========================
+       SEARCH LARKBASE (OPTION)
+    ========================= */
     const res = await fetch(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
       {
@@ -80,12 +63,42 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           filter: {
-            conjunction: "AND",
+            conjunction: "and",
             conditions: [
+              /* ===== THÀNH PHỐ ===== */
               {
                 field_name: "Thành phố",
-                operator: "equals",
+                operator: "is",
                 value: [city], // VD: "Hà Nội"
+              },
+
+              /* ===== QUẬN ===== */
+              {
+                field_name: "Quận",
+                operator: "is",
+                value: [`Quận ${district}`], // VD: "Quận Nam Từ Liêm"
+              },
+
+              /* ===== NHÓM VIỆC (OR) ===== */
+              {
+                conjunction: "or",
+                conditions: [
+                  {
+                    field_name: "Nhóm việc",
+                    operator: "is",
+                    value: ["POD"],
+                  },
+                  {
+                    field_name: "Nhóm việc",
+                    operator: "is",
+                    value: ["Dropship"],
+                  },
+                  {
+                    field_name: "Nhóm việc",
+                    operator: "is",
+                    value: ["POD/Dropship"],
+                  },
+                ],
               },
             ],
           },
@@ -94,41 +107,17 @@ export async function POST(req: Request) {
     );
 
     const data = await res.json();
-    let items = data?.data?.items || [];
 
-    const normalizedDistrict = normalize(district);
-
-    /* ===== 2. FILTER QUẬN + NHÓM VIỆC ===== */
-    items = items.filter((item: any) => {
-      const fields = item.fields || {};
-
-      const recordDistrict = fields["Quận"];
-      const jobGroup = fields["Nhóm việc"];
-
-      if (!recordDistrict || !jobGroup) return false;
-
-      // ✔ check cùng quận
-      const sameDistrict = normalize(recordDistrict).includes(
-        normalizedDistrict
-      );
-
-      // ✔ check nhóm việc hợp lệ
-      const validJobGroup = ALLOWED_JOB_GROUPS.includes(
-        jobGroup.toLowerCase()
-      );
-
-      return sameDistrict && validJobGroup;
-    });
-
-    const companies = items.map((item: any) => ({
-      company: item.fields["Công ty"],
-      job: item.fields["Công việc"],
-      address: item.fields["Địa chỉ"],
-      city: item.fields["Thành phố"],
-      district: item.fields["Quận"],
-      jobGroup: item.fields["Nhóm việc"],
-      linkJD: item.fields["Link JD"],
-    }));
+    const companies =
+      data?.data?.items?.map((item: any) => ({
+        company: item.fields["Công ty"],
+        job: item.fields["Công việc"],
+        address: item.fields["Địa chỉ"],
+        city: item.fields["Thành phố"],
+        district: item.fields["Quận"],
+        jobGroup: item.fields["Nhóm việc"],
+        linkJD: item.fields["Link JD"],
+      })) || [];
 
     return NextResponse.json({
       total: companies.length,
