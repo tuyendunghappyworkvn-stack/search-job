@@ -35,26 +35,15 @@ async function getTenantToken() {
 }
 
 /* =========================
-   BUILD DISTRICT CONDITIONS
+   NORMALIZE DISTRICT (MATCH OPTION)
 ========================= */
-function buildDistrictConditions(district: string) {
+function normalizeDistrict(district: string) {
   const d = district.trim();
 
-  const withQuan =
-    d.toLowerCase().startsWith("quận") ? d : `Quận ${d}`;
+  if (d.toLowerCase().startsWith("quận")) return d;
+  if (d.toLowerCase().startsWith("huyện")) return d;
 
-  return [
-    {
-      field_name: "Quận",
-      operator: "contains",
-      value: [withQuan],
-    },
-    {
-      field_name: "Quận",
-      operator: "contains",
-      value: [d],
-    },
-  ];
+  return `Quận ${d}`;
 }
 
 /* =========================
@@ -76,15 +65,16 @@ export async function POST(req: Request) {
     const conditions: any[] = [
       {
         field_name: "Thành phố",
-        operator: "contains",
-        value: [city],
+        operator: "equals",
+        value: [city], // ví dụ: "Hà Nội"
       },
     ];
 
     if (district) {
       conditions.push({
-        conjunction: "OR",
-        conditions: buildDistrictConditions(district),
+        field_name: "Quận",
+        operator: "equals",
+        value: [normalizeDistrict(district)], // "Quận Nam Từ Liêm"
       });
     }
 
