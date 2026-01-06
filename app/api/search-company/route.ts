@@ -30,21 +30,28 @@ async function getTenantToken() {
   if (!data?.tenant_access_token) {
     throw new Error("Cannot get tenant access token");
   }
-
   return data.tenant_access_token;
 }
 
 /* =========================
-   NORMALIZE DISTRICT (MATCH OPTION)
+   NORMALIZE TEXT
 ========================= */
-function normalizeDistrict(district: string) {
-  const d = district.trim();
-
-  if (d.toLowerCase().startsWith("quận")) return d;
-  if (d.toLowerCase().startsWith("huyện")) return d;
-
-  return `Quận ${d}`;
+function normalize(str: string) {
+  return str
+    .toLowerCase()
+    .replace(/^quận\s+/i, "")
+    .replace(/^huyện\s+/i, "")
+    .trim();
 }
+
+/* =========================
+   ALLOWED JOB GROUPS
+========================= */
+const ALLOWED_JOB_GROUPS = [
+  "pod",
+  "dropship",
+  "pod/dropship",
+];
 
 /* =========================
    POST: SEARCH COMPANY
@@ -53,31 +60,16 @@ export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
 
-    if (!city) {
+    if (!city || !district) {
       return NextResponse.json(
-        { error: "Thiếu thông tin thành phố" },
+        { error: "Thiếu thông tin thành phố hoặc quận" },
         { status: 400 }
       );
     }
 
     const token = await getTenantToken();
 
-    const conditions: any[] = [
-      {
-        field_name: "Thành phố",
-        operator: "equals",
-        value: [city], // ví dụ: "Hà Nội"
-      },
-    ];
-
-    if (district) {
-      conditions.push({
-        field_name: "Quận",
-        operator: "equals",
-        value: [normalizeDistrict(district)], // "Quận Nam Từ Liêm"
-      });
-    }
-
+    /* ===== 1. SEARCH THEO THÀNH PHỐ ===== */
     const res = await fetch(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
       {
@@ -89,22 +81,54 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           filter: {
             conjunction: "AND",
-            conditions,
+            conditions: [
+              {
+                field_name: "Thành phố",
+                operator: "equals",
+                value: [city], // VD: "Hà Nội"
+              },
+            ],
           },
         }),
       }
     );
 
     const data = await res.json();
+    let items = data?.data?.items || [];
 
-    const companies =
-      data?.data?.items?.map((item: any) => ({
-        company: item.fields["Công ty"],
-        job: item.fields["Công việc"],
-        address: item.fields["Địa chỉ"],
-        city: item.fields["Thành phố"],
-        district: item.fields["Quận"],
-      })) || [];
+    const normalizedDistrict = normalize(district);
+
+    /* ===== 2. FILTER QUẬN + NHÓM VIỆC ===== */
+    items = items.filter((item: any) => {
+      const fields = item.fields || {};
+
+      const recordDistrict = fields["Quận"];
+      const jobGroup = fields["Nhóm việc"];
+
+      if (!recordDistrict || !jobGroup) return false;
+
+      // ✔ check cùng quận
+      const sameDistrict = normalize(recordDistrict).includes(
+        normalizedDistrict
+      );
+
+      // ✔ check nhóm việc hợp lệ
+      const validJobGroup = ALLOWED_JOB_GROUPS.includes(
+        jobGroup.toLowerCase()
+      );
+
+      return sameDistrict && validJobGroup;
+    });
+
+    const companies = items.map((item: any) => ({
+      company: item.fields["Công ty"],
+      job: item.fields["Công việc"],
+      address: item.fields["Địa chỉ"],
+      city: item.fields["Thành phố"],
+      district: item.fields["Quận"],
+      jobGroup: item.fields["Nhóm việc"],
+      linkJD: item.fields["Link JD"],
+    }));
 
     return NextResponse.json({
       total: companies.length,
