@@ -13,8 +13,14 @@ const TABLE_ID = process.env.LARK_TABLE_ID!;
 /* =========================
    UTILS
 ========================= */
-function normalize(str: string) {
-  return str.toLowerCase().trim();
+function normalizeValue(val: any): string {
+  if (!val) return "";
+
+  if (Array.isArray(val)) {
+    return String(val[0] || "").toLowerCase().trim();
+  }
+
+  return String(val).toLowerCase().trim();
 }
 
 /* =========================
@@ -37,11 +43,12 @@ async function getTenantToken(): Promise<string> {
   if (!data?.tenant_access_token) {
     throw new Error("Cannot get tenant access token");
   }
+
   return data.tenant_access_token;
 }
 
 /* =========================
-   GET ALL RECORDS (PAGINATION)
+   GET ALL RECORDS
 ========================= */
 async function getAllRecords(token: string) {
   let all: any[] = [];
@@ -74,41 +81,22 @@ export async function POST(req: Request) {
     const { city, district } = await req.json();
 
     if (!city || !district) {
-      return NextResponse.json({
-        total: 0,
-        companies: [],
-      });
+      return NextResponse.json({ total: 0, companies: [] });
     }
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const cityN = normalize(city);
-    const districtN = normalize(district);
+    const cityN = normalizeValue(city);
+    const districtN = normalizeValue(district);
 
     const results = records.filter((r) => {
       const f = r.fields || {};
 
-      const cCity = normalize(f["Thành phố"] || "");
-      const cDistrict = normalize(f["Quận"] || "");
-      const jobGroup = f["Nhóm việc"];
+      const cCity = normalizeValue(f["Thành phố"]);
+      const cDistrict = normalizeValue(f["Quận"]);
 
-      /* ===== MATCH CITY + DISTRICT ===== */
-      const matchLocation =
-        cCity === cityN && cDistrict.includes(districtN);
-
-      /* ===== MATCH JOB GROUP ===== */
-      let matchJob = false;
-
-      if (Array.isArray(jobGroup)) {
-        matchJob = jobGroup.some((j) =>
-          ["POD", "Dropship", "POD/Dropship"].includes(j)
-        );
-      } else if (typeof jobGroup === "string") {
-        matchJob = ["POD", "Dropship", "POD/Dropship"].includes(jobGroup);
-      }
-
-      return matchLocation && matchJob;
+      return cCity === cityN && cDistrict.includes(districtN);
     });
 
     return NextResponse.json({
@@ -119,7 +107,6 @@ export async function POST(req: Request) {
         address: r.fields["Địa chỉ"],
         city: r.fields["Thành phố"],
         district: r.fields["Quận"],
-        jobGroup: r.fields["Nhóm việc"],
         linkJD: r.fields["Link JD"],
       })),
     });
