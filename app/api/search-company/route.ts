@@ -30,8 +30,45 @@ async function getTenantToken() {
   if (!data?.tenant_access_token) {
     throw new Error("Cannot get tenant access token");
   }
-
   return data.tenant_access_token;
+}
+
+/* =========================
+   SEARCH WITH PAGINATION
+========================= */
+async function searchAllRecords(
+  token: string,
+  filter: any
+) {
+  let allItems: any[] = [];
+  let pageToken: string | undefined = undefined;
+
+  do {
+    const res = await fetch(
+      `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          page_size: 100, // max của Lark
+          page_token: pageToken,
+          filter,
+        }),
+      }
+    );
+
+    const data = await res.json();
+
+    const items = data?.data?.items || [];
+    allItems = allItems.concat(items);
+
+    pageToken = data?.data?.page_token;
+  } while (pageToken);
+
+  return allItems;
 }
 
 /* =========================
@@ -51,73 +88,58 @@ export async function POST(req: Request) {
     const token = await getTenantToken();
 
     /* =========================
-       SEARCH LARKBASE (OPTION)
+       FILTER (OPTION - Y CHANG N8N)
     ========================= */
-    const res = await fetch(
-      `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+    const filter = {
+      conjunction: "and",
+      conditions: [
+        {
+          field_name: "Thành phố",
+          operator: "is",
+          value: [city], // VD: "Hà Nội"
         },
-        body: JSON.stringify({
-          filter: {
-            conjunction: "and",
-            conditions: [
-              /* ===== THÀNH PHỐ ===== */
-              {
-                field_name: "Thành phố",
-                operator: "is",
-                value: [city], // VD: "Hà Nội"
-              },
+        {
+          field_name: "Quận",
+          operator: "is",
+          value: [`Quận ${district}`], // VD: "Quận Nam Từ Liêm"
+        },
+        {
+          conjunction: "or",
+          conditions: [
+            {
+              field_name: "Nhóm việc",
+              operator: "is",
+              value: ["POD"],
+            },
+            {
+              field_name: "Nhóm việc",
+              operator: "is",
+              value: ["Dropship"],
+            },
+            {
+              field_name: "Nhóm việc",
+              operator: "is",
+              value: ["POD/Dropship"],
+            },
+          ],
+        },
+      ],
+    };
 
-              /* ===== QUẬN ===== */
-              {
-                field_name: "Quận",
-                operator: "is",
-                value: [`Quận ${district}`], // VD: "Quận Nam Từ Liêm"
-              },
+    /* =========================
+       SEARCH ALL MATCHED RECORDS
+    ========================= */
+    const items = await searchAllRecords(token, filter);
 
-              /* ===== NHÓM VIỆC (OR) ===== */
-              {
-                conjunction: "or",
-                conditions: [
-                  {
-                    field_name: "Nhóm việc",
-                    operator: "is",
-                    value: ["POD"],
-                  },
-                  {
-                    field_name: "Nhóm việc",
-                    operator: "is",
-                    value: ["Dropship"],
-                  },
-                  {
-                    field_name: "Nhóm việc",
-                    operator: "is",
-                    value: ["POD/Dropship"],
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-      }
-    );
-
-    const data = await res.json();
-
-    const companies =
-      data?.data?.items?.map((item: any) => ({
-        company: item.fields["Công ty"],
-        job: item.fields["Công việc"],
-        address: item.fields["Địa chỉ"],
-        city: item.fields["Thành phố"],
-        district: item.fields["Quận"],
-        jobGroup: item.fields["Nhóm việc"],
-        linkJD: item.fields["Link JD"],
-      })) || [];
+    const companies = items.map((item: any) => ({
+      company: item.fields["Công ty"],
+      job: item.fields["Công việc"],
+      address: item.fields["Địa chỉ"],
+      city: item.fields["Thành phố"],
+      district: item.fields["Quận"],
+      jobGroup: item.fields["Nhóm việc"],
+      linkJD: item.fields["Link JD"],
+    }));
 
     return NextResponse.json({
       total: companies.length,
