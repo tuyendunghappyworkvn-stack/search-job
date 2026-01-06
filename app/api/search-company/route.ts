@@ -30,15 +30,14 @@ async function getTenantToken() {
   if (!data?.tenant_access_token) {
     throw new Error("Cannot get tenant access token");
   }
-
   return data.tenant_access_token;
 }
 
 /* =========================
-   GET ALL RECORDS (PAGINATION)
+   GET ALL RECORDS (pagination)
 ========================= */
 async function getAllRecords(token: string) {
-  let records: any[] = [];
+  let all: any[] = [];
   let pageToken: string | undefined;
 
   do {
@@ -53,30 +52,11 @@ async function getAllRecords(token: string) {
     });
 
     const data = await res.json();
-    records = records.concat(data?.data?.items || []);
+    all = all.concat(data?.data?.items || []);
     pageToken = data?.data?.page_token;
   } while (pageToken);
 
-  return records;
-}
-
-/* =========================
-   OPTION → TEXT (CỰC QUAN TRỌNG)
-========================= */
-function getOptionText(value: any): string {
-  if (!value) return "";
-
-  if (typeof value === "string") return value;
-
-  if (Array.isArray(value)) {
-    return value.map((v) => v.text).join(" ");
-  }
-
-  if (typeof value === "object" && value.text) {
-    return value.text;
-  }
-
-  return "";
+  return all;
 }
 
 /* =========================
@@ -87,45 +67,38 @@ export async function POST(req: Request) {
     const { city, district } = await req.json();
 
     if (!city || !district) {
-      return NextResponse.json(
-        { total: 0, companies: [] },
-        { status: 200 }
-      );
+      return NextResponse.json({
+        total: 0,
+        companies: [],
+        reason: "Missing city or district",
+      });
     }
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const cityInput = city.trim();
-    const districtInput = district.trim();
+    const cityLower = city.toLowerCase();
+    const districtLower = district.toLowerCase();
 
-    const companies = records
-      .filter((item) => {
-        const fields = item.fields || {};
+    const results = records.filter((r) => {
+      const fields = r.fields || {};
 
-        const cityText = getOptionText(fields["Thành phố"]);
-        const districtText = getOptionText(fields["Quận"]);
+      const cityVal = fields["Thành phố"]?.[0]?.text || "";
+      const districtVal = fields["Quận"]?.[0]?.text || "";
 
-        if (!cityText || !districtText) return false;
+      return (
+        cityVal.toLowerCase().includes(cityLower) &&
+        districtVal.toLowerCase().includes(districtLower)
+      );
+    });
 
-        const matchCity = cityText === cityInput;
-
-        const matchDistrict =
-          districtText === districtInput ||
-          districtText.replace("Quận ", "") === districtInput;
-
-        return matchCity && matchDistrict;
-      })
-      .map((item) => {
-        const f = item.fields || {};
-        return {
-          company: f["Công ty"] || "",
-          job: f["Công việc"] || "",
-          address: f["Địa chỉ"] || "",
-          city: getOptionText(f["Thành phố"]),
-          district: getOptionText(f["Quận"]),
-        };
-      });
+    const companies = results.map((r) => ({
+      company: r.fields["Công ty"],
+      job: r.fields["Công việc"],
+      address: r.fields["Địa chỉ"],
+      city: r.fields["Thành phố"]?.[0]?.text,
+      district: r.fields["Quận"]?.[0]?.text,
+    }));
 
     return NextResponse.json({
       total: companies.length,
