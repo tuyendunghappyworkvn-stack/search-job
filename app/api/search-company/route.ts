@@ -11,16 +11,9 @@ const BASE_ID = process.env.LARK_BASE_ID!;
 const TABLE_ID = process.env.LARK_TABLE_ID!;
 
 /* =========================
-   UTILS
+   GET TOKEN
 ========================= */
-function normalize(str: string) {
-  return str.toLowerCase().trim();
-}
-
-/* =========================
-   GET TENANT TOKEN
-========================= */
-async function getTenantToken(): Promise<string> {
+async function getTenantToken() {
   const res = await fetch(
     "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal",
     {
@@ -35,13 +28,23 @@ async function getTenantToken(): Promise<string> {
 
   const data = await res.json();
   if (!data?.tenant_access_token) {
-    throw new Error("Cannot get tenant access token");
+    throw new Error("Cannot get tenant token");
   }
+
   return data.tenant_access_token;
 }
 
 /* =========================
-   GET ALL RECORDS (PAGINATION)
+   NORMALIZE LARK FIELD
+========================= */
+function getText(field: any): string {
+  if (!field) return "";
+  if (typeof field === "object") return field.text || "";
+  return String(field);
+}
+
+/* =========================
+   LOAD ALL RECORDS
 ========================= */
 async function getAllRecords(token: string) {
   let all: any[] = [];
@@ -67,66 +70,51 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   POST: SEARCH COMPANY
+   POST SEARCH
 ========================= */
 export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
 
-    if (!city || !district) {
-      return NextResponse.json({
-        total: 0,
-        companies: [],
-      });
+    const cityInput = city?.trim();
+    const districtInput = district?.trim();
+
+    if (!cityInput || !districtInput) {
+      return NextResponse.json({ total: 0, companies: [] });
     }
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const cityN = normalize(city);
-    const districtN = normalize(district);
+    const result = records.filter((r) => {
+      const fields = r.fields || {};
 
-    const results = records.filter((r) => {
-      const f = r.fields || {};
+      const cityText = getText(fields["Thành phố"]);
+      const districtText = getText(fields["Quận"]);
+      const jobType = getText(fields["Loại công việc"]);
 
-      const cCity = normalize(f["Thành phố"] || "");
-      const cDistrict = normalize(f["Quận"] || "");
-      const jobGroup = f["Nhóm việc"];
-
-      /* ===== MATCH CITY + DISTRICT ===== */
-      const matchLocation =
-        cCity === cityN && cDistrict.includes(districtN);
-
-      /* ===== MATCH JOB GROUP ===== */
-      let matchJob = false;
-
-      if (Array.isArray(jobGroup)) {
-        matchJob = jobGroup.some((j) =>
-          ["POD", "Dropship", "POD/Dropship"].includes(j)
-        );
-      } else if (typeof jobGroup === "string") {
-        matchJob = ["POD", "Dropship", "POD/Dropship"].includes(jobGroup);
-      }
-
-      return matchLocation && matchJob;
+      return (
+        cityText === cityInput &&
+        districtText === `Quận ${districtInput}` &&
+        jobType.includes("POD")
+      );
     });
 
     return NextResponse.json({
-      total: results.length,
-      companies: results.map((r) => ({
+      total: result.length,
+      companies: result.map((r) => ({
         company: r.fields["Công ty"],
         job: r.fields["Công việc"],
         address: r.fields["Địa chỉ"],
-        city: r.fields["Thành phố"],
-        district: r.fields["Quận"],
-        jobGroup: r.fields["Nhóm việc"],
-        linkJD: r.fields["Link JD"],
+        city: getText(r.fields["Thành phố"]),
+        district: getText(r.fields["Quận"]),
+        jobType: getText(r.fields["Loại công việc"]),
       })),
     });
   } catch (err: any) {
     console.error("SEARCH ERROR:", err);
     return NextResponse.json(
-      { error: err.message || "Search failed" },
+      { error: err.message || "Server error" },
       { status: 500 }
     );
   }
