@@ -11,6 +11,13 @@ const BASE_ID = process.env.LARK_BASE_ID!;
 const TABLE_ID = process.env.LARK_TABLE_ID!;
 
 /* =========================
+   UTILS
+========================= */
+function normalize(str: string) {
+  return str.toLowerCase().trim();
+}
+
+/* =========================
    GET TENANT TOKEN
 ========================= */
 async function getTenantToken(): Promise<string> {
@@ -79,13 +86,13 @@ export async function POST(req: Request) {
     const districtOptions = await getFieldOptions(token, "Quận");
     const jobGroupOptions = await getFieldOptions(token, "Nhóm việc");
 
-    /* ===== MAP TEXT → OPTION_ID ===== */
+    /* ===== MAP TEXT → OPTION_ID (PHÙ HỢP DATA CỦA BẠN) ===== */
     const cityOpt = cityOptions.find(
-      (o) => o.name === city
+      (o) => normalize(o.name) === normalize(city)
     )?.id;
 
     const districtOpt = districtOptions.find(
-      (o) => o.name === `Quận ${district}`
+      (o) => normalize(o.name).includes(normalize(district))
     )?.id;
 
     const jobGroupIds: string[] = jobGroupOptions
@@ -99,6 +106,8 @@ export async function POST(req: Request) {
         total: 0,
         companies: [],
         debug: {
+          city,
+          district,
           cityOpt,
           districtOpt,
           jobGroupIds,
@@ -131,7 +140,7 @@ export async function POST(req: Request) {
       })),
     };
 
-    /* ===== SEARCH (PAGE 1 – đủ dùng trước) ===== */
+    /* ===== SEARCH (PAGE 1 – OK VỚI FILTER) ===== */
     const res = await fetch(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
       {
@@ -159,6 +168,7 @@ export async function POST(req: Request) {
         city: item.fields["Thành phố"],
         district: item.fields["Quận"],
         jobGroup: item.fields["Nhóm việc"],
+        linkJD: item.fields["Link JD"],
       })),
     });
   } catch (err: any) {
