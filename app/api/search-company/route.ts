@@ -2,15 +2,25 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/* =========================
+   ENV
+========================= */
 const APP_ID = process.env.LARK_APP_ID!;
 const APP_SECRET = process.env.LARK_APP_SECRET!;
 const BASE_ID = process.env.LARK_BASE_ID!;
 const TABLE_ID = process.env.LARK_TABLE_ID!;
 
 /* =========================
-   TOKEN
+   UTILS
 ========================= */
-async function getTenantToken() {
+function normalize(str: string) {
+  return str.toLowerCase().trim();
+}
+
+/* =========================
+   GET TENANT TOKEN
+========================= */
+async function getTenantToken(): Promise<string> {
   const res = await fetch(
     "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal",
     {
@@ -23,7 +33,10 @@ async function getTenantToken() {
     }
   );
 
-  const data: any = await res.json();
+  const data = await res.json();
+  if (!data?.tenant_access_token) {
+    throw new Error("Cannot get tenant access token");
+  }
   return data.tenant_access_token;
 }
 
@@ -38,14 +51,14 @@ async function getAllRecords(token: string) {
     const url = new URL(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records`
     );
-    url.searchParams.set("page_size", "500");
+    url.searchParams.set("page_size", "100");
     if (pageToken) url.searchParams.set("page_token", pageToken);
 
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data: any = await res.json();
+    const data = await res.json();
     all = all.concat(data?.data?.items || []);
     pageToken = data?.data?.page_token;
   } while (pageToken);
@@ -54,54 +67,66 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   HELPER: LOOKUP TEXT
-========================= */
-function lookupText(field: any): string {
-  if (!Array.isArray(field)) return "";
-  return field.map((v) => v.text).join(" ").toLowerCase();
-}
-
-/* =========================
-   POST
+   POST: SEARCH COMPANY
 ========================= */
 export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
 
+    if (!city || !district) {
+      return NextResponse.json({
+        total: 0,
+        companies: [],
+      });
+    }
+
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const cityNeedle = city?.toLowerCase();
-    const districtNeedle = district?.toLowerCase();
+    const cityN = normalize(city);
+    const districtN = normalize(district);
 
-    const companies = records
-      .filter((r) => {
-        const fields = r.fields || {};
+    const results = records.filter((r) => {
+      const f = r.fields || {};
 
-        const cityText = lookupText(fields["Thành phố"]);
-        const districtText = lookupText(fields["Quận"]);
+      const cCity = normalize(f["Thành phố"] || "");
+      const cDistrict = normalize(f["Quận"] || "");
+      const jobGroup = f["Nhóm việc"];
 
-        return (
-          cityText.includes(cityNeedle) &&
-          districtText.includes(districtNeedle)
+      /* ===== MATCH CITY + DISTRICT ===== */
+      const matchLocation =
+        cCity === cityN && cDistrict.includes(districtN);
+
+      /* ===== MATCH JOB GROUP ===== */
+      let matchJob = false;
+
+      if (Array.isArray(jobGroup)) {
+        matchJob = jobGroup.some((j) =>
+          ["POD", "Dropship", "POD/Dropship"].includes(j)
         );
-      })
-      .map((r) => ({
+      } else if (typeof jobGroup === "string") {
+        matchJob = ["POD", "Dropship", "POD/Dropship"].includes(jobGroup);
+      }
+
+      return matchLocation && matchJob;
+    });
+
+    return NextResponse.json({
+      total: results.length,
+      companies: results.map((r) => ({
         company: r.fields["Công ty"],
         job: r.fields["Công việc"],
         address: r.fields["Địa chỉ"],
-        city: lookupText(r.fields["Thành phố"]),
-        district: lookupText(r.fields["Quận"]),
-      }));
-
-    return NextResponse.json({
-      total: companies.length,
-      companies,
+        city: r.fields["Thành phố"],
+        district: r.fields["Quận"],
+        jobGroup: r.fields["Nhóm việc"],
+        linkJD: r.fields["Link JD"],
+      })),
     });
   } catch (err: any) {
     console.error("SEARCH ERROR:", err);
     return NextResponse.json(
-      { error: err.message || "Server error" },
+      { error: err.message || "Search failed" },
       { status: 500 }
     );
   }
