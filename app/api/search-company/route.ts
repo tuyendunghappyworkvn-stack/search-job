@@ -2,29 +2,19 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/* =========================
+   ENV
+========================= */
 const APP_ID = process.env.LARK_APP_ID!;
 const APP_SECRET = process.env.LARK_APP_SECRET!;
 const BASE_ID = process.env.LARK_BASE_ID!;
 const TABLE_ID = process.env.LARK_TABLE_ID!;
 
 /* =========================
-   CHUẨN HÓA QUẬN
-========================= */
-function normalizeDistrict(district: string) {
-  const d = district.trim();
-
-  if (d.toLowerCase().startsWith("quận")) {
-    return d;
-  }
-
-  return `Quận ${d}`;
-}
-
-/* =========================
    GET TENANT TOKEN
 ========================= */
 async function getTenantToken(): Promise<string> {
-  const response = await fetch(
+  const res = await fetch(
     "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal",
     {
       method: "POST",
@@ -36,55 +26,113 @@ async function getTenantToken(): Promise<string> {
     }
   );
 
-  const data = await response.json();
+  const data = await res.json();
   if (!data?.tenant_access_token) {
-    throw new Error("Cannot get tenant token");
+    throw new Error("Cannot get tenant access token");
   }
   return data.tenant_access_token;
 }
 
+/* =========================
+   GET FIELD OPTIONS
+========================= */
+async function getFieldOptions(
+  token: string,
+  fieldName: string
+): Promise<{ id: string; name: string }[]> {
+  const res = await fetch(
+    `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/fields`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const data = await res.json();
+  const field = data?.data?.items?.find(
+    (f: any) => f.field_name === fieldName
+  );
+
+  return field?.property?.options || [];
+}
+
+/* =========================
+   POST: SEARCH COMPANY
+========================= */
 export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
 
     if (!city || !district) {
-      return NextResponse.json(
-        { error: "Thiếu thành phố hoặc quận" },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        total: 0,
+        companies: [],
+        reason: "Missing city or district",
+      });
     }
 
     const token = await getTenantToken();
 
-    const districtOption = normalizeDistrict(district);
+    /* ===== LẤY OPTIONS ===== */
+    const cityOptions = await getFieldOptions(token, "Thành phố");
+    const districtOptions = await getFieldOptions(token, "Quận");
+    const jobGroupOptions = await getFieldOptions(token, "Nhóm việc");
 
+    /* ===== MAP TEXT → OPTION_ID ===== */
+    const cityOpt = cityOptions.find(
+      (o) => o.name === city
+    )?.id;
+
+    const districtOpt = districtOptions.find(
+      (o) => o.name === `Quận ${district}`
+    )?.id;
+
+    const jobGroupIds: string[] = jobGroupOptions
+      .filter((o) =>
+        ["POD", "Dropship", "POD/Dropship"].includes(o.name)
+      )
+      .map((o) => o.id);
+
+    if (!cityOpt || !districtOpt || jobGroupIds.length === 0) {
+      return NextResponse.json({
+        total: 0,
+        companies: [],
+        debug: {
+          cityOpt,
+          districtOpt,
+          jobGroupIds,
+        },
+      });
+    }
+
+    /* ===== BUILD FILTER (OR of AND) ===== */
     const filter = {
       conjunction: "or",
-      conditions: ["POD", "Dropship", "POD/Dropship"].map(
-        (jobGroup) => ({
-          conjunction: "and",
-          conditions: [
-            {
-              field_name: "Thành phố",
-              operator: "is",
-              value: [city],
-            },
-            {
-              field_name: "Quận",
-              operator: "is",
-              value: [districtOption], // 🔴 QUAN TRỌNG
-            },
-            {
-              field_name: "Nhóm việc",
-              operator: "is",
-              value: [jobGroup],
-            },
-          ],
-        })
-      ),
+      conditions: jobGroupIds.map((jobId: string) => ({
+        conjunction: "and",
+        conditions: [
+          {
+            field_name: "Thành phố",
+            operator: "is",
+            value: [cityOpt],
+          },
+          {
+            field_name: "Quận",
+            operator: "is",
+            value: [districtOpt],
+          },
+          {
+            field_name: "Nhóm việc",
+            operator: "is",
+            value: [jobId],
+          },
+        ],
+      })),
     };
 
-    const response = await fetch(
+    /* ===== SEARCH (PAGE 1 – đủ dùng trước) ===== */
+    const res = await fetch(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
       {
         method: "POST",
@@ -99,25 +147,24 @@ export async function POST(req: Request) {
       }
     );
 
-    const data = await response.json();
+    const data = await res.json();
+    const items = data?.data?.items || [];
 
     return NextResponse.json({
-      total: data?.data?.items?.length || 0,
-      companies:
-        data?.data?.items?.map((item: any) => ({
-          company: item.fields?.["Công ty"],
-          job: item.fields?.["Công việc"],
-          address: item.fields?.["Địa chỉ"],
-          city: item.fields?.["Thành phố"],
-          district: item.fields?.["Quận"],
-          jobGroup: item.fields?.["Nhóm việc"],
-          linkJD: item.fields?.["Link JD"],
-        })) || [],
+      total: items.length,
+      companies: items.map((item: any) => ({
+        company: item.fields["Công ty"],
+        job: item.fields["Công việc"],
+        address: item.fields["Địa chỉ"],
+        city: item.fields["Thành phố"],
+        district: item.fields["Quận"],
+        jobGroup: item.fields["Nhóm việc"],
+      })),
     });
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    console.error("SEARCH ERROR:", err);
     return NextResponse.json(
-      { error: "Search failed" },
+      { error: err.message || "Search failed" },
       { status: 500 }
     );
   }
