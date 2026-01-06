@@ -41,27 +41,29 @@ async function getTenantToken(): Promise<string> {
 }
 
 /* =========================
-   GET FIELD OPTIONS
+   GET ALL RECORDS (PAGINATION)
 ========================= */
-async function getFieldOptions(
-  token: string,
-  fieldName: string
-): Promise<{ id: string; name: string }[]> {
-  const res = await fetch(
-    `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/fields`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+async function getAllRecords(token: string) {
+  let all: any[] = [];
+  let pageToken: string | undefined;
 
-  const data = await res.json();
-  const field = data?.data?.items?.find(
-    (f: any) => f.field_name === fieldName
-  );
+  do {
+    const url = new URL(
+      `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records`
+    );
+    url.searchParams.set("page_size", "100");
+    if (pageToken) url.searchParams.set("page_token", pageToken);
 
-  return field?.property?.options || [];
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+    all = all.concat(data?.data?.items || []);
+    pageToken = data?.data?.page_token;
+  } while (pageToken);
+
+  return all;
 }
 
 /* =========================
@@ -75,100 +77,50 @@ export async function POST(req: Request) {
       return NextResponse.json({
         total: 0,
         companies: [],
-        reason: "Missing city or district",
       });
     }
 
     const token = await getTenantToken();
+    const records = await getAllRecords(token);
 
-    /* ===== LẤY OPTIONS ===== */
-    const cityOptions = await getFieldOptions(token, "Thành phố");
-    const districtOptions = await getFieldOptions(token, "Quận");
-    const jobGroupOptions = await getFieldOptions(token, "Nhóm việc");
+    const cityN = normalize(city);
+    const districtN = normalize(district);
 
-    /* ===== MAP TEXT → OPTION_ID (PHÙ HỢP DATA CỦA BẠN) ===== */
-    const cityOpt = cityOptions.find(
-      (o) => normalize(o.name) === normalize(city)
-    )?.id;
+    const results = records.filter((r) => {
+      const f = r.fields || {};
 
-    const districtOpt = districtOptions.find(
-      (o) => normalize(o.name).includes(normalize(district))
-    )?.id;
+      const cCity = normalize(f["Thành phố"] || "");
+      const cDistrict = normalize(f["Quận"] || "");
+      const jobGroup = f["Nhóm việc"];
 
-    const jobGroupIds: string[] = jobGroupOptions
-      .filter((o) =>
-        ["POD", "Dropship", "POD/Dropship"].includes(o.name)
-      )
-      .map((o) => o.id);
+      /* ===== MATCH CITY + DISTRICT ===== */
+      const matchLocation =
+        cCity === cityN && cDistrict.includes(districtN);
 
-    if (!cityOpt || !districtOpt || jobGroupIds.length === 0) {
-      return NextResponse.json({
-        total: 0,
-        companies: [],
-        debug: {
-          city,
-          district,
-          cityOpt,
-          districtOpt,
-          jobGroupIds,
-        },
-      });
-    }
+      /* ===== MATCH JOB GROUP ===== */
+      let matchJob = false;
 
-    /* ===== BUILD FILTER (OR of AND) ===== */
-    const filter = {
-      conjunction: "or",
-      conditions: jobGroupIds.map((jobId: string) => ({
-        conjunction: "and",
-        conditions: [
-          {
-            field_name: "Thành phố",
-            operator: "is",
-            value: [cityOpt],
-          },
-          {
-            field_name: "Quận",
-            operator: "is",
-            value: [districtOpt],
-          },
-          {
-            field_name: "Nhóm việc",
-            operator: "is",
-            value: [jobId],
-          },
-        ],
-      })),
-    };
-
-    /* ===== SEARCH (PAGE 1 – OK VỚI FILTER) ===== */
-    const res = await fetch(
-      `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          page_size: 100,
-          filter,
-        }),
+      if (Array.isArray(jobGroup)) {
+        matchJob = jobGroup.some((j) =>
+          ["POD", "Dropship", "POD/Dropship"].includes(j)
+        );
+      } else if (typeof jobGroup === "string") {
+        matchJob = ["POD", "Dropship", "POD/Dropship"].includes(jobGroup);
       }
-    );
 
-    const data = await res.json();
-    const items = data?.data?.items || [];
+      return matchLocation && matchJob;
+    });
 
     return NextResponse.json({
-      total: items.length,
-      companies: items.map((item: any) => ({
-        company: item.fields["Công ty"],
-        job: item.fields["Công việc"],
-        address: item.fields["Địa chỉ"],
-        city: item.fields["Thành phố"],
-        district: item.fields["Quận"],
-        jobGroup: item.fields["Nhóm việc"],
-        linkJD: item.fields["Link JD"],
+      total: results.length,
+      companies: results.map((r) => ({
+        company: r.fields["Công ty"],
+        job: r.fields["Công việc"],
+        address: r.fields["Địa chỉ"],
+        city: r.fields["Thành phố"],
+        district: r.fields["Quận"],
+        jobGroup: r.fields["Nhóm việc"],
+        linkJD: r.fields["Link JD"],
       })),
     });
   } catch (err: any) {
