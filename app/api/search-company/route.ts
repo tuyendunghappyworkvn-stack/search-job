@@ -35,6 +35,26 @@ async function getTenantToken() {
 }
 
 /* =========================
+   NORMALIZE DISTRICT
+========================= */
+function normalizeDistrict(district: string) {
+  if (!district) return "";
+
+  const d = district.trim();
+
+  const lower = d.toLowerCase();
+  if (
+    lower.startsWith("quận") ||
+    lower.startsWith("huyện") ||
+    lower.startsWith("thị xã")
+  ) {
+    return d;
+  }
+
+  return `Quận ${d}`;
+}
+
+/* =========================
    POST: SEARCH COMPANY
 ========================= */
 export async function POST(req: Request) {
@@ -47,6 +67,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    const normalizedDistrict = district
+      ? normalizeDistrict(district)
+      : "";
 
     const token = await getTenantToken();
 
@@ -67,12 +91,12 @@ export async function POST(req: Request) {
                 operator: "contains",
                 value: [city],
               },
-              ...(district
+              ...(normalizedDistrict
                 ? [
                     {
                       field_name: "Quận",
                       operator: "contains",
-                      value: [district],
+                      value: [normalizedDistrict],
                     },
                   ]
                 : []),
