@@ -2,16 +2,13 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-/* =========================
-   ENV
-========================= */
 const APP_ID = process.env.LARK_APP_ID!;
 const APP_SECRET = process.env.LARK_APP_SECRET!;
 const BASE_ID = process.env.LARK_BASE_ID!;
 const TABLE_ID = process.env.LARK_TABLE_ID!;
 
 /* =========================
-   GET TENANT TOKEN
+   TOKEN
 ========================= */
 async function getTenantToken() {
   const res = await fetch(
@@ -26,15 +23,12 @@ async function getTenantToken() {
     }
   );
 
-  const data = await res.json();
-  if (!data?.tenant_access_token) {
-    throw new Error("Cannot get tenant access token");
-  }
+  const data: any = await res.json();
   return data.tenant_access_token;
 }
 
 /* =========================
-   GET ALL RECORDS (pagination)
+   GET ALL RECORDS
 ========================= */
 async function getAllRecords(token: string) {
   let all: any[] = [];
@@ -51,7 +45,7 @@ async function getAllRecords(token: string) {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = await res.json();
+    const data: any = await res.json();
     all = all.concat(data?.data?.items || []);
     pageToken = data?.data?.page_token;
   } while (pageToken);
@@ -60,19 +54,31 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   POST: SEARCH COMPANY
+   HELPER: GET LOOKUP TEXT
+========================= */
+function getLookupText(val: any): string {
+  if (!val) return "";
+
+  // case: [{ text: "Hà Nội" }]
+  if (Array.isArray(val)) {
+    return val.map((v) => v?.text || v).join(" ");
+  }
+
+  // case: { text: "Hà Nội" }
+  if (typeof val === "object") {
+    return val.text || "";
+  }
+
+  // case: "Hà Nội"
+  return String(val);
+}
+
+/* =========================
+   SEARCH
 ========================= */
 export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
-
-    if (!city || !district) {
-      return NextResponse.json({
-        total: 0,
-        companies: [],
-        reason: "Missing city or district",
-      });
-    }
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
@@ -80,24 +86,24 @@ export async function POST(req: Request) {
     const cityLower = city.toLowerCase();
     const districtLower = district.toLowerCase();
 
-    const results = records.filter((r) => {
+    const matched = records.filter((r) => {
       const fields = r.fields || {};
 
-      const cityVal = fields["Thành phố"]?.[0]?.text || "";
-      const districtVal = fields["Quận"]?.[0]?.text || "";
+      const cityText = getLookupText(fields["Thành phố"]).toLowerCase();
+      const districtText = getLookupText(fields["Quận"]).toLowerCase();
 
       return (
-        cityVal.toLowerCase().includes(cityLower) &&
-        districtVal.toLowerCase().includes(districtLower)
+        cityText.includes(cityLower) &&
+        districtText.includes(districtLower)
       );
     });
 
-    const companies = results.map((r) => ({
+    const companies = matched.map((r) => ({
       company: r.fields["Công ty"],
       job: r.fields["Công việc"],
       address: r.fields["Địa chỉ"],
-      city: r.fields["Thành phố"]?.[0]?.text,
-      district: r.fields["Quận"]?.[0]?.text,
+      city: getLookupText(r.fields["Thành phố"]),
+      district: getLookupText(r.fields["Quận"]),
     }));
 
     return NextResponse.json({
