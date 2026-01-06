@@ -13,14 +13,9 @@ const TABLE_ID = process.env.LARK_TABLE_ID!;
 /* =========================
    UTILS
 ========================= */
-function normalizeValue(val: any): string {
-  if (!val) return "";
-
-  if (Array.isArray(val)) {
-    return String(val[0] || "").toLowerCase().trim();
-  }
-
-  return String(val).toLowerCase().trim();
+function normalize(str: any): string {
+  if (!str) return "";
+  return String(str).toLowerCase().trim();
 }
 
 /* =========================
@@ -74,7 +69,7 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   POST: SEARCH COMPANY
+   POST: SEARCH
 ========================= */
 export async function POST(req: Request) {
   try {
@@ -87,14 +82,14 @@ export async function POST(req: Request) {
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const cityN = normalizeValue(city);
-    const districtN = normalizeValue(district);
+    const cityN = normalize(city);
+    const districtN = normalize(district);
 
     const results = records.filter((r) => {
       const f = r.fields || {};
 
-      const cCity = normalizeValue(f["Thành phố"]);
-      const cDistrict = normalizeValue(f["Quận"]);
+      const cCity = normalize(f["Thành phố"]);
+      const cDistrict = normalize(f["Quận"]);
 
       return cCity === cityN && cDistrict.includes(districtN);
     });
@@ -107,6 +102,8 @@ export async function POST(req: Request) {
         address: r.fields["Địa chỉ"],
         city: r.fields["Thành phố"],
         district: r.fields["Quận"],
+        status: r.fields["Trạng thái"],
+        jobGroup: r.fields["Nhóm việc"],
         linkJD: r.fields["Link JD"],
       })),
     });
