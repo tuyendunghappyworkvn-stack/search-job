@@ -35,23 +35,26 @@ async function getTenantToken() {
 }
 
 /* =========================
-   NORMALIZE DISTRICT
+   BUILD DISTRICT CONDITIONS
 ========================= */
-function normalizeDistrict(district: string) {
-  if (!district) return "";
-
+function buildDistrictConditions(district: string) {
   const d = district.trim();
 
-  const lower = d.toLowerCase();
-  if (
-    lower.startsWith("quận") ||
-    lower.startsWith("huyện") ||
-    lower.startsWith("thị xã")
-  ) {
-    return d;
-  }
+  const withQuan =
+    d.toLowerCase().startsWith("quận") ? d : `Quận ${d}`;
 
-  return `Quận ${d}`;
+  return [
+    {
+      field_name: "Quận",
+      operator: "contains",
+      value: [withQuan],
+    },
+    {
+      field_name: "Quận",
+      operator: "contains",
+      value: [d],
+    },
+  ];
 }
 
 /* =========================
@@ -68,11 +71,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const normalizedDistrict = district
-      ? normalizeDistrict(district)
-      : "";
-
     const token = await getTenantToken();
+
+    const conditions: any[] = [
+      {
+        field_name: "Thành phố",
+        operator: "contains",
+        value: [city],
+      },
+    ];
+
+    if (district) {
+      conditions.push({
+        conjunction: "OR",
+        conditions: buildDistrictConditions(district),
+      });
+    }
 
     const res = await fetch(
       `https://open.larksuite.com/open-apis/bitable/v1/apps/${BASE_ID}/tables/${TABLE_ID}/records/search`,
@@ -85,22 +99,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           filter: {
             conjunction: "AND",
-            conditions: [
-              {
-                field_name: "Thành phố",
-                operator: "contains",
-                value: [city],
-              },
-              ...(normalizedDistrict
-                ? [
-                    {
-                      field_name: "Quận",
-                      operator: "contains",
-                      value: [normalizedDistrict],
-                    },
-                  ]
-                : []),
-            ],
+            conditions,
           },
         }),
       }
