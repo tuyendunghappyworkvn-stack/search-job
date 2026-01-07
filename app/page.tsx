@@ -69,6 +69,7 @@ export default function HomePage() {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
+  const [jobKeyword, setJobKeyword] = useState("");
 
   const [cityTouched, setCityTouched] = useState(false);
   const [districtTouched, setDistrictTouched] = useState(false);
@@ -102,7 +103,11 @@ export default function HomePage() {
       const res = await fetch("/api/search-company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city, district }),
+        body: JSON.stringify({
+          city,
+          district,
+          jobKeyword,
+        }),
       });
 
       const data = await res.json();
@@ -117,6 +122,16 @@ export default function HomePage() {
     acc[item.company].push(item);
     return acc;
   }, {});
+
+  /* =========================
+     TEXT TỔNG HỢP (COPY)
+  ========================= */
+  const jobTextSummary = results
+    .map(
+      (item, idx) =>
+        `${idx + 1}) ${item.company} - ${item.job} - ${item.jd_link}`
+    )
+    .join("\n");
 
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex items-center justify-center px-4">
@@ -139,6 +154,15 @@ export default function HomePage() {
             value={address}
             onChange={(e) => handleAddressChange(e.target.value)}
           />
+
+          {/* 👉 Ô CÔNG VIỆC */}
+          <input
+            className="w-full rounded-lg border px-4 py-3"
+            placeholder="Công việc (VD: Designer POD)"
+            value={jobKeyword}
+            onChange={(e) => setJobKeyword(e.target.value)}
+          />
+
           <input
             className="w-full rounded-lg border px-4 py-3"
             placeholder="Thành phố"
@@ -148,6 +172,7 @@ export default function HomePage() {
               setCityTouched(true);
             }}
           />
+
           <input
             className="w-full rounded-lg border px-4 py-3"
             placeholder="Quận / Huyện"
@@ -169,7 +194,29 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* ===== KẾT QUẢ ===== */}
+          {/* ===== TEXT TỔNG HỢP (CHỈ HIỆN KHI NHẬP CÔNG VIỆC) ===== */}
+          {jobKeyword.trim() && results.length > 0 && (
+            <div className="relative mt-6">
+              <button
+                onClick={() =>
+                  navigator.clipboard.writeText(jobTextSummary)
+                }
+                className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
+                title="Sao chép"
+              >
+                📋
+              </button>
+
+              <textarea
+                readOnly
+                rows={Math.min(10, results.length + 1)}
+                value={jobTextSummary}
+                className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
+              />
+            </div>
+          )}
+
+          {/* ===== KẾT QUẢ CHI TIẾT ===== */}
           {results.length > 0 && (
             <div className="pt-6 border rounded-lg overflow-hidden">
               {Object.entries(groupedByCompany).map(
@@ -178,21 +225,15 @@ export default function HomePage() {
 
                   return (
                     <div key={company}>
-                      {/* COMPANY ROW – LIST GỌN */}
                       <button
                         onClick={() =>
                           setOpenCompany(isOpen ? null : company)
                         }
-                        className="
-                          w-full flex justify-between items-center
-                          px-4 py-2
-                          text-left
-                          bg-white
-                          hover:bg-orange-50
-                          border-b
-                        "
+                        className="w-full flex justify-between items-center
+                          px-4 py-2 text-left bg-white
+                          hover:bg-orange-50 border-b"
                       >
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium">
                           {company}
                         </span>
                         <span className="text-xs text-gray-500">
@@ -200,7 +241,6 @@ export default function HomePage() {
                         </span>
                       </button>
 
-                      {/* JOB DETAIL */}
                       {isOpen && (
                         <div className="bg-orange-50 px-4 py-3 space-y-2">
                           {jobs.map(
@@ -209,13 +249,13 @@ export default function HomePage() {
                                 key={idx}
                                 className="bg-white rounded-md p-3 text-sm"
                               >
-                                <p className="font-medium text-gray-900">
+                                <p className="font-medium">
                                   {job.job}
                                 </p>
 
                                 {job.salary_min &&
                                   job.salary_max && (
-                                    <p className="text-gray-600">
+                                    <p>
                                       - Mức lương:{" "}
                                       {Number(
                                         job.salary_min
@@ -229,15 +269,13 @@ export default function HomePage() {
                                   )}
 
                                 {job.working_time && (
-                                  <p className="text-gray-600">
+                                  <p>
                                     - Thời gian làm việc:{" "}
                                     {job.working_time}
                                   </p>
                                 )}
 
-                                <p className="text-gray-600">
-                                  - Địa chỉ: {job.address}
-                                </p>
+                                <p>- Địa chỉ: {job.address}</p>
 
                                 {job.jd_link && (
                                   <a
