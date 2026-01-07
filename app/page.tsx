@@ -87,7 +87,7 @@ export default function HomePage() {
   const [copied, setCopied] = useState(false);
 
   /* =========================
-     LOAD ALL COMPANIES (1 LẦN)
+     LOAD ALL COMPANIES
   ========================= */
   useEffect(() => {
     fetch("/api/companies")
@@ -300,10 +300,26 @@ export default function HomePage() {
                           {jobs.map((job: CompanyResult, idx: number) => (
                             <div
                               key={idx}
-                              className="bg-white rounded-md p-3 text-sm"
+                              className="bg-white rounded-md p-3 text-sm space-y-1"
                             >
                               <p className="font-medium">{job.job}</p>
+
+                              {job.salary_min && job.salary_max && (
+                                <p>
+                                  - Mức lương:{" "}
+                                  {Number(job.salary_min).toLocaleString()} –{" "}
+                                  {Number(job.salary_max).toLocaleString()} + thưởng
+                                </p>
+                              )}
+
+                              {job.working_time && (
+                                <p>
+                                  - Thời gian làm việc: {job.working_time}
+                                </p>
+                              )}
+
                               <p>- Địa chỉ: {job.address}</p>
+
                               {job.jd_link && (
                                 <a
                                   href={job.jd_link}
