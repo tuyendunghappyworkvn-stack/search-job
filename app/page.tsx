@@ -76,6 +76,9 @@ export default function HomePage() {
   const [results, setResults] = useState<CompanyResult[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ✅ STATE MỞ / ĐÓNG CÔNG TY
+  const [openCompany, setOpenCompany] = useState<string | null>(null);
+
   /* =========================
      HANDLE ADDRESS CHANGE
   ========================= */
@@ -124,6 +127,15 @@ export default function HomePage() {
       setLoading(false);
     }
   }
+
+  /* =========================
+     GROUP THEO CÔNG TY
+  ========================= */
+  const groupedByCompany = results.reduce((acc: any, item) => {
+    if (!acc[item.company]) acc[item.company] = [];
+    acc[item.company].push(item);
+    return acc;
+  }, {});
 
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex items-center justify-center px-4">
@@ -207,28 +219,57 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* ===== KẾT QUẢ ===== */}
+          {/* ===== KẾT QUẢ (THEO CÔNG TY) ===== */}
           {results.length > 0 && (
             <div className="pt-6 space-y-4">
-              {results.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="border rounded-lg p-4 text-sm text-gray-700"
-                >
-                  <p>
-                    <b>Công ty:</b> {item.company}
-                  </p>
-                  <p>
-                    <b>Vị trí:</b> {item.job}
-                  </p>
-                  <p>
-                    <b>Quận:</b> {item.district}
-                  </p>
-                  <p>
-                    <b>Địa chỉ:</b> {item.address}
-                  </p>
-                </div>
-              ))}
+              {Object.entries(groupedByCompany).map(
+                ([company, jobs]: any) => {
+                  const isOpen = openCompany === company;
+
+                  return (
+                    <div
+                      key={company}
+                      className="border rounded-xl bg-white"
+                    >
+                      {/* COMPANY HEADER */}
+                      <button
+                        onClick={() =>
+                          setOpenCompany(
+                            isOpen ? null : company
+                          )
+                        }
+                        className="w-full flex justify-between items-center p-4 text-left font-semibold hover:bg-gray-50"
+                      >
+                        <span>{company}</span>
+                        <span className="text-sm text-gray-500">
+                          {jobs.length} vị trí
+                        </span>
+                      </button>
+
+                      {/* JOB DETAIL */}
+                      {isOpen && (
+                        <div className="border-t px-4 py-3 space-y-3">
+                          {jobs.map(
+                            (job: CompanyResult, idx: number) => (
+                              <div
+                                key={idx}
+                                className="rounded-lg bg-gray-50 p-3 text-sm"
+                              >
+                                <p className="font-medium">
+                                  {job.job}
+                                </p>
+                                <p className="text-gray-600">
+                                  📍 {job.address}
+                                </p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+              )}
             </div>
           )}
         </div>
