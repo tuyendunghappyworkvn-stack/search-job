@@ -75,7 +75,8 @@ async function getAllRecords(token: string) {
 ========================= */
 export async function POST(req: Request) {
   try {
-    const { city, district } = await req.json();
+    // ✅ NHẬN THÊM jobKeyword
+    const { city, district, jobKeyword } = await req.json();
 
     if (!city || !district) {
       return NextResponse.json({
@@ -89,14 +90,23 @@ export async function POST(req: Request) {
 
     const cityN = normalize(city);
     const districtN = normalize(district);
+    const jobN = normalize(jobKeyword);
 
     const results = records.filter((r) => {
       const f = r.fields || {};
 
       const cCity = normalize(f["Thành phố"]);
       const cDistrict = normalize(f["Quận"]);
+      const cJob = normalize(f["Công việc"]);
 
-      return cCity === cityN && cDistrict.includes(districtN);
+      // ✅ Điều kiện bắt buộc
+      if (cCity !== cityN) return false;
+      if (!cDistrict.includes(districtN)) return false;
+
+      // ✅ CHỈ LỌC THEO CÔNG VIỆC KHI USER NHẬP
+      if (jobN && !cJob.includes(jobN)) return false;
+
+      return true;
     });
 
     return NextResponse.json({
@@ -118,7 +128,7 @@ export async function POST(req: Request) {
 
           jd_link: f["Link JD"] || "",
 
-          /* ===== OPTIONAL (GIỮ LẠI ĐỂ MỞ RỘNG) ===== */
+          /* ===== OPTIONAL ===== */
           experience: f["Kinh nghiệm"] || "",
           status: f["Trạng thái"] || "",
           jobGroup: f["Nhóm việc"] || "",
