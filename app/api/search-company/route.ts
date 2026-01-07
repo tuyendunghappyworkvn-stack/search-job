@@ -43,7 +43,7 @@ async function getTenantToken(): Promise<string> {
 }
 
 /* =========================
-   GET ALL RECORDS
+   GET ALL RECORDS (PAGINATION)
 ========================= */
 async function getAllRecords(token: string) {
   let all: any[] = [];
@@ -57,7 +57,9 @@ async function getAllRecords(token: string) {
     if (pageToken) url.searchParams.set("page_token", pageToken);
 
     const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     const data = await res.json();
@@ -69,14 +71,17 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   POST: SEARCH
+   POST: SEARCH COMPANY
 ========================= */
 export async function POST(req: Request) {
   try {
     const { city, district } = await req.json();
 
     if (!city || !district) {
-      return NextResponse.json({ total: 0, companies: [] });
+      return NextResponse.json({
+        total: 0,
+        companies: [],
+      });
     }
 
     const token = await getTenantToken();
@@ -96,16 +101,29 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       total: results.length,
-      companies: results.map((r) => ({
-        company: r.fields["Công ty"],
-        job: r.fields["Công việc"],
-        address: r.fields["Địa chỉ"],
-        city: r.fields["Thành phố"],
-        district: r.fields["Quận"],
-        status: r.fields["Trạng thái"],
-        jobGroup: r.fields["Nhóm việc"],
-        linkJD: r.fields["Link JD"],
-      })),
+      companies: results.map((r) => {
+        const f = r.fields || {};
+
+        return {
+          /* ===== GROUP / HEADER ===== */
+          company: f["Công ty"] || "",
+          job: f["Công việc"] || "",
+
+          /* ===== DETAIL ===== */
+          address: f["Địa chỉ"] || "",
+          working_time: f["Thời gian làm việc"] || "",
+
+          salary_min: f["Lương tối thiểu"] || 0,
+          salary_max: f["Lương tối đa"] || 0,
+
+          jd_link: f["Link JD"] || "",
+
+          /* ===== OPTIONAL (GIỮ LẠI ĐỂ MỞ RỘNG) ===== */
+          experience: f["Kinh nghiệm"] || "",
+          status: f["Trạng thái"] || "",
+          jobGroup: f["Nhóm việc"] || "",
+        };
+      }),
     });
   } catch (err: any) {
     console.error("SEARCH ERROR:", err);
