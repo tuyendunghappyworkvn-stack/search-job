@@ -76,7 +76,6 @@ export default function HomePage() {
   const [results, setResults] = useState<CompanyResult[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ STATE MỞ / ĐÓNG CÔNG TY
   const [openCompany, setOpenCompany] = useState<string | null>(null);
 
   /* =========================
@@ -113,10 +112,7 @@ export default function HomePage() {
       const res = await fetch("/api/search-company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city,
-          district,
-        }),
+        body: JSON.stringify({ city, district }),
       });
 
       const data = await res.json();
@@ -163,7 +159,7 @@ export default function HomePage() {
               onChange={(e) => handleAddressChange(e.target.value)}
               placeholder="VD: C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
-                focus:outline-none focus:ring-2 focus:ring-orange-400"
+              focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
@@ -180,9 +176,8 @@ export default function HomePage() {
                 setCityTouched(true);
               }}
               onBlur={() => setCity(formatVietnameseLocation(city))}
-              placeholder="Tự động nhận diện hoặc nhập tay"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
-                focus:outline-none focus:ring-2 focus:ring-orange-400"
+              focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
@@ -201,9 +196,8 @@ export default function HomePage() {
               onBlur={() =>
                 setDistrict(formatVietnameseLocation(district))
               }
-              placeholder="Tự động nhận diện hoặc nhập tay"
               className="w-full rounded-lg border border-gray-300 px-4 py-3
-                focus:outline-none focus:ring-2 focus:ring-orange-400"
+              focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
@@ -213,32 +207,37 @@ export default function HomePage() {
               onClick={handleSearch}
               disabled={loading}
               className="bg-orange-500 hover:bg-orange-600
-                text-white font-semibold px-8 py-3 rounded-lg transition disabled:opacity-60"
+              text-white font-semibold px-8 py-3 rounded-lg transition disabled:opacity-60"
             >
               {loading ? "Đang tra cứu..." : "Tra cứu"}
             </button>
           </div>
 
-          {/* ===== KẾT QUẢ (THEO CÔNG TY) ===== */}
+          {/* ===== KẾT QUẢ ===== */}
           {results.length > 0 && (
-            <div className="pt-6 space-y-4">
+            <div className="pt-6 space-y-3">
               {Object.entries(groupedByCompany).map(
-                ([company, jobs]: any) => {
+                ([company, jobs]: any, idx: number) => {
                   const isOpen = openCompany === company;
 
                   return (
                     <div
                       key={company}
-                      className="border rounded-xl bg-white"
+                      className="border rounded-lg overflow-hidden"
                     >
                       {/* COMPANY HEADER */}
                       <button
                         onClick={() =>
-                          setOpenCompany(
-                            isOpen ? null : company
-                          )
+                          setOpenCompany(isOpen ? null : company)
                         }
-                        className="w-full flex justify-between items-center p-4 text-left font-semibold hover:bg-gray-50"
+                        className={`
+                          w-full flex justify-between items-center
+                          px-4 py-2.5
+                          text-left font-medium
+                          transition
+                          ${idx % 2 === 0 ? "bg-white" : "bg-orange-50"}
+                          hover:bg-orange-100
+                        `}
                       >
                         <span>{company}</span>
                         <span className="text-sm text-gray-500">
@@ -248,12 +247,12 @@ export default function HomePage() {
 
                       {/* JOB DETAIL */}
                       {isOpen && (
-                        <div className="border-t px-4 py-3 space-y-3">
+                        <div className="border-t px-4 py-3 space-y-2 bg-white">
                           {jobs.map(
-                            (job: CompanyResult, idx: number) => (
+                            (job: CompanyResult, jdx: number) => (
                               <div
-                                key={idx}
-                                className="rounded-lg bg-gray-50 p-3 text-sm"
+                                key={jdx}
+                                className="rounded-md bg-orange-50 p-2 text-sm"
                               >
                                 <p className="font-medium">
                                   {job.job}
