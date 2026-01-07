@@ -55,14 +55,16 @@ function parseAddressVN(address: string) {
 }
 
 /* =========================
-   TYPES
+   TYPES (UPDATED)
 ========================= */
 type CompanyResult = {
   company: string;
   job: string;
   address: string;
-  city: string;
-  district: string;
+  working_time?: string;
+  salary_min?: number;
+  salary_max?: number;
+  jd_link?: string;
 };
 
 export default function HomePage() {
@@ -254,12 +256,51 @@ export default function HomePage() {
                                 key={jdx}
                                 className="rounded-md bg-orange-50 p-2 text-sm"
                               >
-                                <p className="font-medium">
+                                <p className="font-medium text-gray-900">
                                   {job.job}
                                 </p>
-                                <p className="text-gray-600">
-                                  📍 {job.address}
-                                </p>
+
+                                {job.salary_min &&
+                                  job.salary_max && (
+                                    <p className="text-gray-600">
+                                      - Mức lương:{" "}
+                                      {Number(
+                                        job.salary_min
+                                      ).toLocaleString()}{" "}
+                                      –{" "}
+                                      {Number(
+                                        job.salary_max
+                                      ).toLocaleString()}{" "}
+                                      + thưởng
+                                    </p>
+                                  )}
+
+                                {job.working_time && (
+                                  <p className="text-gray-600">
+                                    - Thời gian làm việc:{" "}
+                                    {job.working_time}
+                                  </p>
+                                )}
+
+                                {job.address && (
+                                  <p className="text-gray-600">
+                                    - Địa chỉ: {job.address}
+                                  </p>
+                                )}
+
+                                {job.jd_link && (
+                                  <p className="text-gray-600">
+                                    - Link JD:{" "}
+                                    <a
+                                      href={job.jd_link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-orange-600 underline"
+                                    >
+                                      Xem chi tiết
+                                    </a>
+                                  </p>
+                                )}
                               </div>
                             )
                           )}
