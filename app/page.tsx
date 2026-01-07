@@ -124,10 +124,10 @@ export default function HomePage() {
         {/* HEADER */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
-            TRA CỨU CÔNG TY
+            TRA CỨU JOB
           </h1>
           <p className="text-gray-500 mt-2">
-            Nhập thông tin để tra cứu công ty
+            Nhập thông tin để tra job
           </p>
         </div>
 
