@@ -40,10 +40,8 @@ function parseAddressVN(address: string) {
     if (
       part.includes("quận") ||
       part.includes("huyện") ||
-      part.includes("thị xã") ||
       part.includes("nam từ liêm") ||
-      part.includes("bắc từ liêm") ||
-      part.includes("thanh xuân")
+      part.includes("bắc từ liêm")
     ) {
       district = part;
     }
@@ -67,9 +65,7 @@ type CompanyResult = {
 
 export default function HomePage() {
   /* ===== INPUT ===== */
-  const [companyInput, setCompanyInput] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState("");
-
+  const [companyKeyword, setCompanyKeyword] = useState("");
   const [jobKeyword, setJobKeyword] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
@@ -87,19 +83,23 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [openCompany, setOpenCompany] = useState<string | null>(null);
 
+  /* ===== COPY TOAST ===== */
+  const [copied, setCopied] = useState(false);
+
   /* =========================
-     LOAD COMPANY OPTIONS (SEARCH AS YOU TYPE)
+     LOAD ALL COMPANIES (1 LẦN)
   ========================= */
   useEffect(() => {
-    if (!companyInput) {
-      setCompanyOptions([]);
-      return;
-    }
-
-    fetch(`/api/companies?q=${encodeURIComponent(companyInput)}`)
+    fetch("/api/companies")
       .then((res) => res.json())
       .then((data) => setCompanyOptions(data.companies || []));
-  }, [companyInput]);
+  }, []);
+
+  const filteredCompanies = companyKeyword
+    ? companyOptions.filter((c) =>
+        c.toLowerCase().includes(companyKeyword.toLowerCase())
+      )
+    : companyOptions;
 
   function handleAddressChange(value: string) {
     setAddress(value);
@@ -118,12 +118,6 @@ export default function HomePage() {
   }
 
   async function handleSearch() {
-    // ❌ Có gõ công ty nhưng chưa chọn option
-    if (companyInput && !selectedCompany) {
-      alert("Vui lòng chọn Công ty từ danh sách gợi ý");
-      return;
-    }
-
     setLoading(true);
     setResults([]);
 
@@ -132,10 +126,10 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyKeyword: selectedCompany || "",
-          jobKeyword,
           city,
           district,
+          jobKeyword,
+          companyKeyword,
         }),
       });
 
@@ -159,10 +153,15 @@ export default function HomePage() {
     )
     .join("\n");
 
+  function handleCopy() {
+    navigator.clipboard.writeText(jobTextSummary);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex items-center justify-center px-4">
       <div className="w-full max-w-3xl bg-white rounded-2xl shadow-md p-8">
-        {/* HEADER */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">
             TRA CỨU JOB
@@ -172,51 +171,39 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* FORM */}
         <div className="space-y-5">
-          {/* ===== CÔNG TY (BẮT BUỘC CHỌN OPTION) ===== */}
+          {/* ===== COMPANY AUTOCOMPLETE ===== */}
           <div className="relative">
             <input
               className="w-full rounded-lg border px-4 py-3"
               placeholder="Công ty (gõ để tìm)"
-              value={companyInput}
-              onChange={(e) => {
-                setCompanyInput(e.target.value);
-                setSelectedCompany("");
-                setShowCompanyDropdown(true);
-              }}
+              value={companyKeyword}
+              onFocus={() => setShowCompanyDropdown(true)}
+              onChange={(e) => setCompanyKeyword(e.target.value)}
               onBlur={() =>
-                setTimeout(() => {
-                  if (companyInput && !selectedCompany) {
-                    setCompanyInput("");
-                  }
-                  setShowCompanyDropdown(false);
-                }, 150)
+                setTimeout(() => setShowCompanyDropdown(false), 150)
               }
             />
 
-            {showCompanyDropdown &&
-              companyInput &&
-              companyOptions.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
-                  {companyOptions.map((c) => (
-                    <div
-                      key={c}
-                      className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
-                      onClick={() => {
-                        setCompanyInput(c);
-                        setSelectedCompany(c);
-                        setShowCompanyDropdown(false);
-                      }}
-                    >
-                      {c}
-                    </div>
-                  ))}
-                </div>
-              )}
+            {showCompanyDropdown && filteredCompanies.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
+                {filteredCompanies.map((c) => (
+                  <div
+                    key={c}
+                    className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
+                    onClick={() => {
+                      setCompanyKeyword(c);
+                      setShowCompanyDropdown(false);
+                    }}
+                  >
+                    {c}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* ===== CÔNG VIỆC ===== */}
+          {/* ===== JOB ===== */}
           <input
             className="w-full rounded-lg border px-4 py-3"
             placeholder="Công việc (VD: Designer POD)"
@@ -224,7 +211,7 @@ export default function HomePage() {
             onChange={(e) => setJobKeyword(e.target.value)}
           />
 
-          {/* ===== ĐỊA CHỈ ===== */}
+          {/* ===== ADDRESS ===== */}
           <input
             className="w-full rounded-lg border px-4 py-3"
             placeholder="Địa chỉ"
@@ -256,8 +243,7 @@ export default function HomePage() {
             <button
               onClick={handleSearch}
               disabled={loading}
-              className="bg-orange-500 hover:bg-orange-600
-              text-white font-semibold px-8 py-3 rounded-lg"
+              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
             >
               {loading ? "Đang tra cứu..." : "Tra cứu"}
             </button>
@@ -267,13 +253,17 @@ export default function HomePage() {
           {jobKeyword.trim() && results.length > 0 && (
             <div className="relative mt-6">
               <button
-                onClick={() =>
-                  navigator.clipboard.writeText(jobTextSummary)
-                }
+                onClick={handleCopy}
                 className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
               >
                 📋
               </button>
+
+              {copied && (
+                <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
+                  Đã sao chép
+                </div>
+              )}
 
               <textarea
                 readOnly
@@ -297,13 +287,9 @@ export default function HomePage() {
                         onClick={() =>
                           setOpenCompany(isOpen ? null : company)
                         }
-                        className="w-full flex justify-between items-center
-                          px-4 py-2 text-left bg-white
-                          hover:bg-orange-50 border-b"
+                        className="w-full flex justify-between items-center px-4 py-2 text-left bg-white hover:bg-orange-50 border-b"
                       >
-                        <span className="font-medium">
-                          {company}
-                        </span>
+                        <span className="font-medium">{company}</span>
                         <span className="text-xs text-gray-500">
                           {jobs.length} vị trí
                         </span>
@@ -311,52 +297,24 @@ export default function HomePage() {
 
                       {isOpen && (
                         <div className="bg-orange-50 px-4 py-3 space-y-2">
-                          {jobs.map(
-                            (job: CompanyResult, idx: number) => (
-                              <div
-                                key={idx}
-                                className="bg-white rounded-md p-3 text-sm"
-                              >
-                                <p className="font-medium">
-                                  {job.job}
-                                </p>
-
-                                {job.salary_min &&
-                                  job.salary_max && (
-                                    <p>
-                                      - Mức lương:{" "}
-                                      {Number(
-                                        job.salary_min
-                                      ).toLocaleString()}{" "}
-                                      –{" "}
-                                      {Number(
-                                        job.salary_max
-                                      ).toLocaleString()}{" "}
-                                      + thưởng
-                                    </p>
-                                  )}
-
-                                {job.working_time && (
-                                  <p>
-                                    - Thời gian làm việc:{" "}
-                                    {job.working_time}
-                                  </p>
-                                )}
-
-                                <p>- Địa chỉ: {job.address}</p>
-
-                                {job.jd_link && (
-                                  <a
-                                    href={job.jd_link}
-                                    target="_blank"
-                                    className="text-orange-600 underline"
-                                  >
-                                    Xem JD
-                                  </a>
-                                )}
-                              </div>
-                            )
-                          )}
+                          {jobs.map((job: CompanyResult, idx: number) => (
+                            <div
+                              key={idx}
+                              className="bg-white rounded-md p-3 text-sm"
+                            >
+                              <p className="font-medium">{job.job}</p>
+                              <p>- Địa chỉ: {job.address}</p>
+                              {job.jd_link && (
+                                <a
+                                  href={job.jd_link}
+                                  target="_blank"
+                                  className="text-orange-600 underline"
+                                >
+                                  Xem JD
+                                </a>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
