@@ -67,7 +67,9 @@ type CompanyResult = {
 
 export default function HomePage() {
   /* ===== INPUT ===== */
-  const [companyKeyword, setCompanyKeyword] = useState("");
+  const [companyInput, setCompanyInput] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState("");
+
   const [jobKeyword, setJobKeyword] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
@@ -86,17 +88,18 @@ export default function HomePage() {
   const [openCompany, setOpenCompany] = useState<string | null>(null);
 
   /* =========================
-     LOAD COMPANY OPTIONS
+     LOAD COMPANY OPTIONS (SEARCH AS YOU TYPE)
   ========================= */
   useEffect(() => {
-    fetch("/api/companies")
+    if (!companyInput) {
+      setCompanyOptions([]);
+      return;
+    }
+
+    fetch(`/api/companies?q=${encodeURIComponent(companyInput)}`)
       .then((res) => res.json())
       .then((data) => setCompanyOptions(data.companies || []));
-  }, []);
-
-  const filteredCompanies = companyOptions.filter((c) =>
-    c.toLowerCase().includes(companyKeyword.toLowerCase())
-  );
+  }, [companyInput]);
 
   function handleAddressChange(value: string) {
     setAddress(value);
@@ -115,6 +118,12 @@ export default function HomePage() {
   }
 
   async function handleSearch() {
+    // ❌ Có gõ công ty nhưng chưa chọn option
+    if (companyInput && !selectedCompany) {
+      alert("Vui lòng chọn Công ty từ danh sách gợi ý");
+      return;
+    }
+
     setLoading(true);
     setResults([]);
 
@@ -123,10 +132,10 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          companyKeyword: selectedCompany || "",
+          jobKeyword,
           city,
           district,
-          jobKeyword,
-          companyKeyword, // ✅ gửi thêm công ty
         }),
       });
 
@@ -165,31 +174,38 @@ export default function HomePage() {
 
         {/* FORM */}
         <div className="space-y-5">
-          {/* ===== CÔNG TY (AUTOCOMPLETE) ===== */}
+          {/* ===== CÔNG TY (BẮT BUỘC CHỌN OPTION) ===== */}
           <div className="relative">
             <input
               className="w-full rounded-lg border px-4 py-3"
               placeholder="Công ty (gõ để tìm)"
-              value={companyKeyword}
+              value={companyInput}
               onChange={(e) => {
-                setCompanyKeyword(e.target.value);
+                setCompanyInput(e.target.value);
+                setSelectedCompany("");
                 setShowCompanyDropdown(true);
               }}
               onBlur={() =>
-                setTimeout(() => setShowCompanyDropdown(false), 150)
+                setTimeout(() => {
+                  if (companyInput && !selectedCompany) {
+                    setCompanyInput("");
+                  }
+                  setShowCompanyDropdown(false);
+                }, 150)
               }
             />
 
             {showCompanyDropdown &&
-              companyKeyword &&
-              filteredCompanies.length > 0 && (
+              companyInput &&
+              companyOptions.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
-                  {filteredCompanies.map((c) => (
+                  {companyOptions.map((c) => (
                     <div
                       key={c}
                       className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
                       onClick={() => {
-                        setCompanyKeyword(c);
+                        setCompanyInput(c);
+                        setSelectedCompany(c);
                         setShowCompanyDropdown(false);
                       }}
                     >
@@ -200,7 +216,7 @@ export default function HomePage() {
               )}
           </div>
 
-          {/* ===== CÔNG VIỆC (TRÊN ĐỊA CHỈ) ===== */}
+          {/* ===== CÔNG VIỆC ===== */}
           <input
             className="w-full rounded-lg border px-4 py-3"
             placeholder="Công việc (VD: Designer POD)"

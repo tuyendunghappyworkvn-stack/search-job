@@ -71,10 +71,13 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   GET: LIST COMPANY (UNIQUE)
+   GET: LIST COMPANY (UNIQUE + OPTIONAL FILTER)
 ========================= */
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const keyword = normalize(searchParams.get("q"));
+
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
@@ -85,6 +88,10 @@ export async function GET() {
       if (!company) return;
 
       const key = normalize(company);
+
+      // ✅ Nếu có keyword → chỉ lấy company match
+      if (keyword && !key.includes(keyword)) return;
+
       if (!companySet.has(key)) {
         companySet.set(key, company);
       }

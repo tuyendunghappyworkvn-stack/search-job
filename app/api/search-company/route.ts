@@ -71,20 +71,12 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   POST: SEARCH COMPANY + JOB
+   POST: SEARCH (LINH HOẠT)
 ========================= */
 export async function POST(req: Request) {
   try {
-    // ✅ NHẬN THÊM companyKeyword
     const { city, district, jobKeyword, companyKeyword } =
       await req.json();
-
-    if (!city || !district) {
-      return NextResponse.json({
-        total: 0,
-        companies: [],
-      });
-    }
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
@@ -102,16 +94,17 @@ export async function POST(req: Request) {
       const cJob = normalize(f["Công việc"]);
       const cCompany = normalize(f["Công ty"]);
 
-      /* ===== ĐIỀU KIỆN BẮT BUỘC ===== */
-      if (cCity !== cityN) return false;
-      if (!cDistrict.includes(districtN)) return false;
+      // ✅ IF có company → lọc company
+      if (companyN && !cCompany.includes(companyN)) return false;
 
-      /* ===== ĐIỀU KIỆN TÙY CHỌN ===== */
-      // 🔹 Có nhập công việc → lọc theo công việc
+      // ✅ IF có job → lọc job
       if (jobN && !cJob.includes(jobN)) return false;
 
-      // 🔹 Có nhập công ty → lọc theo công ty
-      if (companyN && !cCompany.includes(companyN)) return false;
+      // ✅ IF có city → lọc city
+      if (cityN && cCity !== cityN) return false;
+
+      // ✅ IF có district → lọc district
+      if (districtN && !cDistrict.includes(districtN)) return false;
 
       return true;
     });
