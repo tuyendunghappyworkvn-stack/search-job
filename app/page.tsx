@@ -7,7 +7,6 @@ import { useState } from "react";
 ========================= */
 function formatVietnameseLocation(str: string) {
   if (!str) return "";
-
   return str
     .toLowerCase()
     .trim()
@@ -24,7 +23,6 @@ function parseAddressVN(address: string) {
   if (!address) return { city: "", district: "" };
 
   const parts = address.split(",").map((p) => p.trim().toLowerCase());
-
   let city = "";
   let district = "";
 
@@ -55,7 +53,7 @@ function parseAddressVN(address: string) {
 }
 
 /* =========================
-   TYPES (UPDATED)
+   TYPES
 ========================= */
 type CompanyResult = {
   company: string;
@@ -80,9 +78,6 @@ export default function HomePage() {
 
   const [openCompany, setOpenCompany] = useState<string | null>(null);
 
-  /* =========================
-     HANDLE ADDRESS CHANGE
-  ========================= */
   function handleAddressChange(value: string) {
     setAddress(value);
 
@@ -93,19 +88,12 @@ export default function HomePage() {
     }
 
     const parsed = parseAddressVN(value);
-
-    if (!cityTouched && parsed.city) {
+    if (!cityTouched && parsed.city)
       setCity(formatVietnameseLocation(parsed.city));
-    }
-
-    if (!districtTouched && parsed.district) {
+    if (!districtTouched && parsed.district)
       setDistrict(formatVietnameseLocation(parsed.district));
-    }
   }
 
-  /* =========================
-     SEARCH
-  ========================= */
   async function handleSearch() {
     setLoading(true);
     setResults([]);
@@ -119,16 +107,11 @@ export default function HomePage() {
 
       const data = await res.json();
       setResults(data.companies || []);
-    } catch (err) {
-      console.error("SEARCH ERROR:", err);
     } finally {
       setLoading(false);
     }
   }
 
-  /* =========================
-     GROUP THEO CÔNG TY
-  ========================= */
   const groupedByCompany = results.reduce((acc: any, item) => {
     if (!acc[item.company]) acc[item.company] = [];
     acc[item.company].push(item);
@@ -150,66 +133,37 @@ export default function HomePage() {
 
         {/* FORM */}
         <div className="space-y-5">
-          {/* ĐỊA CHỈ */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Địa chỉ
-            </label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => handleAddressChange(e.target.value)}
-              placeholder="VD: C14 Bắc Hà, Trung Văn, Nam Từ Liêm, Hà Nội"
-              className="w-full rounded-lg border border-gray-300 px-4 py-3
-              focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
+          <input
+            className="w-full rounded-lg border px-4 py-3"
+            placeholder="Địa chỉ"
+            value={address}
+            onChange={(e) => handleAddressChange(e.target.value)}
+          />
+          <input
+            className="w-full rounded-lg border px-4 py-3"
+            placeholder="Thành phố"
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value);
+              setCityTouched(true);
+            }}
+          />
+          <input
+            className="w-full rounded-lg border px-4 py-3"
+            placeholder="Quận / Huyện"
+            value={district}
+            onChange={(e) => {
+              setDistrict(e.target.value);
+              setDistrictTouched(true);
+            }}
+          />
 
-          {/* THÀNH PHỐ */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Thành phố
-            </label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                setCityTouched(true);
-              }}
-              onBlur={() => setCity(formatVietnameseLocation(city))}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3
-              focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
-
-          {/* QUẬN / HUYỆN */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Quận / Huyện
-            </label>
-            <input
-              type="text"
-              value={district}
-              onChange={(e) => {
-                setDistrict(e.target.value);
-                setDistrictTouched(true);
-              }}
-              onBlur={() =>
-                setDistrict(formatVietnameseLocation(district))
-              }
-              className="w-full rounded-lg border border-gray-300 px-4 py-3
-              focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
-
-          {/* BUTTON */}
-          <div className="pt-2 flex justify-center">
+          <div className="flex justify-center">
             <button
               onClick={handleSearch}
               disabled={loading}
               className="bg-orange-500 hover:bg-orange-600
-              text-white font-semibold px-8 py-3 rounded-lg transition disabled:opacity-60"
+              text-white font-semibold px-8 py-3 rounded-lg"
             >
               {loading ? "Đang tra cứu..." : "Tra cứu"}
             </button>
@@ -217,44 +171,43 @@ export default function HomePage() {
 
           {/* ===== KẾT QUẢ ===== */}
           {results.length > 0 && (
-            <div className="pt-6 space-y-3">
+            <div className="pt-6 border rounded-lg overflow-hidden">
               {Object.entries(groupedByCompany).map(
-                ([company, jobs]: any, idx: number) => {
+                ([company, jobs]: any) => {
                   const isOpen = openCompany === company;
 
                   return (
-                    <div
-                      key={company}
-                      className="border rounded-lg overflow-hidden"
-                    >
-                      {/* COMPANY HEADER */}
+                    <div key={company}>
+                      {/* COMPANY ROW – LIST GỌN */}
                       <button
                         onClick={() =>
                           setOpenCompany(isOpen ? null : company)
                         }
-                        className={`
+                        className="
                           w-full flex justify-between items-center
-                          px-4 py-2.5
-                          text-left font-medium
-                          transition
-                          ${idx % 2 === 0 ? "bg-white" : "bg-orange-50"}
-                          hover:bg-orange-100
-                        `}
+                          px-4 py-2
+                          text-left
+                          bg-white
+                          hover:bg-orange-50
+                          border-b
+                        "
                       >
-                        <span>{company}</span>
-                        <span className="text-sm text-gray-500">
+                        <span className="font-medium text-gray-900">
+                          {company}
+                        </span>
+                        <span className="text-xs text-gray-500">
                           {jobs.length} vị trí
                         </span>
                       </button>
 
                       {/* JOB DETAIL */}
                       {isOpen && (
-                        <div className="border-t px-4 py-3 space-y-2 bg-white">
+                        <div className="bg-orange-50 px-4 py-3 space-y-2">
                           {jobs.map(
-                            (job: CompanyResult, jdx: number) => (
+                            (job: CompanyResult, idx: number) => (
                               <div
-                                key={jdx}
-                                className="rounded-md bg-orange-50 p-2 text-sm"
+                                key={idx}
+                                className="bg-white rounded-md p-3 text-sm"
                               >
                                 <p className="font-medium text-gray-900">
                                   {job.job}
@@ -282,24 +235,18 @@ export default function HomePage() {
                                   </p>
                                 )}
 
-                                {job.address && (
-                                  <p className="text-gray-600">
-                                    - Địa chỉ: {job.address}
-                                  </p>
-                                )}
+                                <p className="text-gray-600">
+                                  - Địa chỉ: {job.address}
+                                </p>
 
                                 {job.jd_link && (
-                                  <p className="text-gray-600">
-                                    - Link JD:{" "}
-                                    <a
-                                      href={job.jd_link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-orange-600 underline"
-                                    >
-                                      Xem chi tiết
-                                    </a>
-                                  </p>
+                                  <a
+                                    href={job.jd_link}
+                                    target="_blank"
+                                    className="text-orange-600 underline"
+                                  >
+                                    Xem JD
+                                  </a>
                                 )}
                               </div>
                             )
