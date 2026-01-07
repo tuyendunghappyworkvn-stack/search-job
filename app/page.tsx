@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /* =========================
    FORMAT ĐỊA DANH VIỆT NAM
@@ -66,18 +66,37 @@ type CompanyResult = {
 };
 
 export default function HomePage() {
+  /* ===== INPUT ===== */
+  const [companyKeyword, setCompanyKeyword] = useState("");
+  const [jobKeyword, setJobKeyword] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
-  const [jobKeyword, setJobKeyword] = useState("");
 
   const [cityTouched, setCityTouched] = useState(false);
   const [districtTouched, setDistrictTouched] = useState(false);
 
+  /* ===== AUTOCOMPLETE ===== */
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+
+  /* ===== RESULT ===== */
   const [results, setResults] = useState<CompanyResult[]>([]);
   const [loading, setLoading] = useState(false);
-
   const [openCompany, setOpenCompany] = useState<string | null>(null);
+
+  /* =========================
+     LOAD COMPANY OPTIONS
+  ========================= */
+  useEffect(() => {
+    fetch("/api/companies")
+      .then((res) => res.json())
+      .then((data) => setCompanyOptions(data.companies || []));
+  }, []);
+
+  const filteredCompanies = companyOptions.filter((c) =>
+    c.toLowerCase().includes(companyKeyword.toLowerCase())
+  );
 
   function handleAddressChange(value: string) {
     setAddress(value);
@@ -107,6 +126,7 @@ export default function HomePage() {
           city,
           district,
           jobKeyword,
+          companyKeyword, // ✅ gửi thêm công ty
         }),
       });
 
@@ -123,9 +143,6 @@ export default function HomePage() {
     return acc;
   }, {});
 
-  /* =========================
-     TEXT TỔNG HỢP (COPY)
-  ========================= */
   const jobTextSummary = results
     .map(
       (item, idx) =>
@@ -148,19 +165,55 @@ export default function HomePage() {
 
         {/* FORM */}
         <div className="space-y-5">
-          <input
-            className="w-full rounded-lg border px-4 py-3"
-            placeholder="Địa chỉ"
-            value={address}
-            onChange={(e) => handleAddressChange(e.target.value)}
-          />
+          {/* ===== CÔNG TY (AUTOCOMPLETE) ===== */}
+          <div className="relative">
+            <input
+              className="w-full rounded-lg border px-4 py-3"
+              placeholder="Công ty (gõ để tìm)"
+              value={companyKeyword}
+              onChange={(e) => {
+                setCompanyKeyword(e.target.value);
+                setShowCompanyDropdown(true);
+              }}
+              onBlur={() =>
+                setTimeout(() => setShowCompanyDropdown(false), 150)
+              }
+            />
 
-          {/* 👉 Ô CÔNG VIỆC */}
+            {showCompanyDropdown &&
+              companyKeyword &&
+              filteredCompanies.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
+                  {filteredCompanies.map((c) => (
+                    <div
+                      key={c}
+                      className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
+                      onClick={() => {
+                        setCompanyKeyword(c);
+                        setShowCompanyDropdown(false);
+                      }}
+                    >
+                      {c}
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+
+          {/* ===== CÔNG VIỆC (TRÊN ĐỊA CHỈ) ===== */}
           <input
             className="w-full rounded-lg border px-4 py-3"
             placeholder="Công việc (VD: Designer POD)"
             value={jobKeyword}
             onChange={(e) => setJobKeyword(e.target.value)}
+          />
+
+          {/* ===== ĐỊA CHỈ ===== */}
+          <input
+            className="w-full rounded-lg border px-4 py-3"
+            placeholder="Địa chỉ"
+            value={address}
+            onChange={(e) => handleAddressChange(e.target.value)}
           />
 
           <input
@@ -194,7 +247,7 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* ===== TEXT TỔNG HỢP (CHỈ HIỆN KHI NHẬP CÔNG VIỆC) ===== */}
+          {/* ===== TEXT COPY ===== */}
           {jobKeyword.trim() && results.length > 0 && (
             <div className="relative mt-6">
               <button
@@ -202,7 +255,6 @@ export default function HomePage() {
                   navigator.clipboard.writeText(jobTextSummary)
                 }
                 className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
-                title="Sao chép"
               >
                 📋
               </button>
@@ -216,7 +268,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ===== KẾT QUẢ CHI TIẾT ===== */}
+          {/* ===== KẾT QUẢ ===== */}
           {results.length > 0 && (
             <div className="pt-6 border rounded-lg overflow-hidden">
               {Object.entries(groupedByCompany).map(
