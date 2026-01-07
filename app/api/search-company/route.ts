@@ -71,12 +71,13 @@ async function getAllRecords(token: string) {
 }
 
 /* =========================
-   POST: SEARCH COMPANY
+   POST: SEARCH COMPANY + JOB
 ========================= */
 export async function POST(req: Request) {
   try {
-    // ✅ NHẬN THÊM jobKeyword
-    const { city, district, jobKeyword } = await req.json();
+    // ✅ NHẬN THÊM companyKeyword
+    const { city, district, jobKeyword, companyKeyword } =
+      await req.json();
 
     if (!city || !district) {
       return NextResponse.json({
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
     const cityN = normalize(city);
     const districtN = normalize(district);
     const jobN = normalize(jobKeyword);
+    const companyN = normalize(companyKeyword);
 
     const results = records.filter((r) => {
       const f = r.fields || {};
@@ -98,13 +100,18 @@ export async function POST(req: Request) {
       const cCity = normalize(f["Thành phố"]);
       const cDistrict = normalize(f["Quận"]);
       const cJob = normalize(f["Công việc"]);
+      const cCompany = normalize(f["Công ty"]);
 
-      // ✅ Điều kiện bắt buộc
+      /* ===== ĐIỀU KIỆN BẮT BUỘC ===== */
       if (cCity !== cityN) return false;
       if (!cDistrict.includes(districtN)) return false;
 
-      // ✅ CHỈ LỌC THEO CÔNG VIỆC KHI USER NHẬP
+      /* ===== ĐIỀU KIỆN TÙY CHỌN ===== */
+      // 🔹 Có nhập công việc → lọc theo công việc
       if (jobN && !cJob.includes(jobN)) return false;
+
+      // 🔹 Có nhập công ty → lọc theo công ty
+      if (companyN && !cCompany.includes(companyN)) return false;
 
       return true;
     });
