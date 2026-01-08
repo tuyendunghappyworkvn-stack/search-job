@@ -140,7 +140,6 @@ export default function HomePage() {
         ========================= */}
         {activeTab === "form" && (
           <div className="space-y-5">
-            {/* COMPANY */}
             <div className="relative">
               <input
                 className={`w-full rounded-lg border px-4 py-3 ${
@@ -270,96 +269,93 @@ export default function HomePage() {
         )}
 
         {/* =========================
-           COPY TEXT
+           COPY + RESULT (CHỈ TAB 1)
         ========================= */}
-        {results.length > 0 && (
-          <div className="relative mt-6">
-            <button
-              onClick={handleCopy}
-              className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
-            >
-              📋
-            </button>
+        {activeTab === "form" && results.length > 0 && (
+          <>
+            <div className="relative mt-6">
+              <button
+                onClick={handleCopy}
+                className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
+              >
+                📋
+              </button>
 
-            {copied && (
-              <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
-                Đã sao chép
-              </div>
-            )}
-
-            <textarea
-              readOnly
-              rows={Math.min(10, results.length + 1)}
-              value={jobTextSummary}
-              className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
-            />
-          </div>
-        )}
-
-        {/* =========================
-           RESULT DETAIL
-        ========================= */}
-        {results.length > 0 && (
-          <div className="pt-6 border rounded-lg overflow-hidden">
-            {Object.entries(groupedByCompany).map(
-              ([company, jobs]: any) => (
-                <div key={company}>
-                  <button
-                    onClick={() =>
-                      setOpenCompany(
-                        openCompany === company ? null : company
-                      )
-                    }
-                    className="w-full flex justify-between items-center px-4 py-2 text-left bg-white hover:bg-orange-50 border-b"
-                  >
-                    <span className="font-medium">{company}</span>
-                    <span className="text-xs text-gray-500">
-                      {jobs.length} vị trí
-                    </span>
-                  </button>
-
-                  {openCompany === company && (
-                    <div className="bg-orange-50 px-4 py-3 space-y-2">
-                      {jobs.map((job: CompanyResult, idx: number) => (
-                        <div
-                          key={idx}
-                          className="bg-white rounded-md p-3 text-sm space-y-1"
-                        >
-                          <p className="font-medium">{job.job}</p>
-
-                          {job.salary_min && job.salary_max && (
-                            <p>
-                              - Mức lương:{" "}
-                              {Number(job.salary_min).toLocaleString()} –{" "}
-                              {Number(job.salary_max).toLocaleString()} + thưởng
-                            </p>
-                          )}
-
-                          {job.working_time && (
-                            <p>
-                              - Thời gian làm việc: {job.working_time}
-                            </p>
-                          )}
-
-                          <p>- Địa chỉ: {job.address}</p>
-
-                          {job.jd_link && (
-                            <a
-                              href={job.jd_link}
-                              target="_blank"
-                              className="text-orange-600 underline"
-                            >
-                              Xem JD
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {copied && (
+                <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
+                  Đã sao chép
                 </div>
-              )
-            )}
-          </div>
+              )}
+
+              <textarea
+                readOnly
+                rows={Math.min(10, results.length + 1)}
+                value={jobTextSummary}
+                className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
+              />
+            </div>
+
+            <div className="pt-6 border rounded-lg overflow-hidden">
+              {Object.entries(groupedByCompany).map(
+                ([company, jobs]: any) => (
+                  <div key={company}>
+                    <button
+                      onClick={() =>
+                        setOpenCompany(
+                          openCompany === company ? null : company
+                        )
+                      }
+                      className="w-full flex justify-between items-center px-4 py-2 text-left bg-white hover:bg-orange-50 border-b"
+                    >
+                      <span className="font-medium">{company}</span>
+                      <span className="text-xs text-gray-500">
+                        {jobs.length} vị trí
+                      </span>
+                    </button>
+
+                    {openCompany === company && (
+                      <div className="bg-orange-50 px-4 py-3 space-y-2">
+                        {jobs.map((job: CompanyResult, idx: number) => (
+                          <div
+                            key={idx}
+                            className="bg-white rounded-md p-3 text-sm space-y-1"
+                          >
+                            <p className="font-medium">{job.job}</p>
+
+                            {job.salary_min && job.salary_max && (
+                              <p>
+                                - Mức lương:{" "}
+                                {Number(job.salary_min).toLocaleString()} –{" "}
+                                {Number(job.salary_max).toLocaleString()} + thưởng
+                              </p>
+                            )}
+
+                            {job.working_time && (
+                              <p>
+                                - Thời gian làm việc: {job.working_time}
+                              </p>
+                            )}
+
+                            <p>- Địa chỉ: {job.address}</p>
+
+                            {job.jd_link && (
+                              <a
+                                href={job.jd_link}
+                                target="_blank"
+                                className="text-orange-600 underline"
+                              >
+                                Xem JD
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
