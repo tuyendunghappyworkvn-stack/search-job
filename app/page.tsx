@@ -77,6 +77,7 @@ export default function HomePage() {
   /* ===== AUTOCOMPLETE ===== */
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(true); // ⭐ NEW
 
   /* ===== RESULT ===== */
   const [results, setResults] = useState<CompanyResult[]>([]);
@@ -90,9 +91,14 @@ export default function HomePage() {
      LOAD ALL COMPANIES
   ========================= */
   useEffect(() => {
+    setLoadingCompanies(true); // ⭐ NEW
+
     fetch("/api/companies")
       .then((res) => res.json())
-      .then((data) => setCompanyOptions(data.companies || []));
+      .then((data) => setCompanyOptions(data.companies || []))
+      .finally(() => {
+        setLoadingCompanies(false); // ⭐ NEW
+      });
   }, []);
 
   const filteredCompanies = companyKeyword
@@ -175,32 +181,43 @@ export default function HomePage() {
           {/* ===== COMPANY AUTOCOMPLETE ===== */}
           <div className="relative">
             <input
-              className="w-full rounded-lg border px-4 py-3"
-              placeholder="Công ty (gõ để tìm)"
+              className={`w-full rounded-lg border px-4 py-3 ${
+                loadingCompanies ? "bg-gray-100 text-gray-500" : ""
+              }`}
+              placeholder={
+                loadingCompanies
+                  ? "Đang tải danh sách công ty..."
+                  : "Công ty (gõ để tìm)"
+              }
               value={companyKeyword}
-              onFocus={() => setShowCompanyDropdown(true)}
+              disabled={loadingCompanies} // ⭐ NEW
+              onFocus={() =>
+                !loadingCompanies && setShowCompanyDropdown(true)
+              }
               onChange={(e) => setCompanyKeyword(e.target.value)}
               onBlur={() =>
                 setTimeout(() => setShowCompanyDropdown(false), 150)
               }
             />
 
-            {showCompanyDropdown && filteredCompanies.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
-                {filteredCompanies.map((c) => (
-                  <div
-                    key={c}
-                    className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
-                    onClick={() => {
-                      setCompanyKeyword(c);
-                      setShowCompanyDropdown(false);
-                    }}
-                  >
-                    {c}
-                  </div>
-                ))}
-              </div>
-            )}
+            {!loadingCompanies &&
+              showCompanyDropdown &&
+              filteredCompanies.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
+                  {filteredCompanies.map((c) => (
+                    <div
+                      key={c}
+                      className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
+                      onClick={() => {
+                        setCompanyKeyword(c);
+                        setShowCompanyDropdown(false);
+                      }}
+                    >
+                      {c}
+                    </div>
+                  ))}
+                </div>
+              )}
           </div>
 
           {/* ===== JOB ===== */}
