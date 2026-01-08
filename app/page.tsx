@@ -267,28 +267,30 @@ export default function HomePage() {
           </div>
 
           {/* ===== TEXT COPY ===== */}
-          {jobKeyword.trim() && results.length > 0 && (
-            <div className="relative mt-6">
-              <button
-                onClick={handleCopy}
-                className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
-              >
-                📋
-              </button>
+          {results.length > 0 &&
+            (jobKeyword.trim() || companyKeyword.trim()) && (
+              <div className="relative mt-6">
+                <button
+                  onClick={handleCopy}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
+                  title="Sao chép"
+                >
+                  📋
+                </button>
 
-              {copied && (
-                <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
-                  Đã sao chép
-                </div>
-              )}
+                {copied && (
+                  <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
+                    Đã sao chép
+                  </div>
+                )}
 
-              <textarea
-                readOnly
-                rows={Math.min(10, results.length + 1)}
-                value={jobTextSummary}
-                className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
-              />
-            </div>
+                <textarea
+                  readOnly
+                  rows={Math.min(10, results.length + 1)}
+                  value={jobTextSummary}
+                  className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
+                />
+              </div>
           )}
 
           {/* ===== KẾT QUẢ ===== */}
