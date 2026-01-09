@@ -10,31 +10,40 @@ function normalize(str: string) {
 }
 
 /* =========================
-   JOB KEYWORDS
+   JOB KEYWORD MAP (GIỐNG FE)
 ========================= */
-const JOB_KEYWORDS = [
-  "idea",
-  "design",
-  "designer",
-  "seller",
-  "etsy",
-  "amazon",
-  "shopify",
-  "tiktok",
-  "ebay",
-  "facebook",
-  "website",
-  "marketing",
-  "digital marketing",
-  "customer support",
-  "support",
-  "fulfillment",
-  "facebook ads",
-  "video editor",
-  "video",
-];
+const JOB_KEYWORD_MAP: Record<string, string[]> = {
+  idea: ["idea"],
 
-const LEADER_KEYWORDS = ["leader", "lead", "team lead"];
+  design: ["design", "designer"],
+
+  customer_support: ["customer support", "supporter"],
+
+  etsy: ["etsy"],
+  amazon: ["amazon"],
+  ebay: ["ebay"],
+  tiktok: ["tiktok", "tiktok shop"],
+  shopify: ["shopify", "website"],
+
+  facebook: [
+    "facebook",
+    "ads",
+    "marketing",
+    "digital marketing",
+    "performance",
+  ],
+
+  video: ["video", "video editor"],
+
+  seller: ["seller", "seller pod", "pod"],
+
+  fulfillment: ["fulfill", "fulfillment"],
+};
+
+/* =========================
+   PLATFORM KEYS
+========================= */
+const PLATFORM_KEYS = ["etsy", "amazon", "ebay", "tiktok", "shopify"];
 
 /* =========================
    LOCATION KEYWORDS
@@ -49,17 +58,17 @@ const CITIES = [
 ];
 
 const DISTRICTS = [
-  "quận",
-  "huyện",
   "nam từ liêm",
   "bắc từ liêm",
   "thanh xuân",
   "cầu giấy",
   "hoàn kiếm",
+  "hoàng mai",
+  "đống đa",
 ];
 
 /* =========================
-   POST: PARSE CV TEXT
+   POST: PARSE CV
 ========================= */
 export async function POST(req: Request) {
   try {
@@ -77,21 +86,26 @@ export async function POST(req: Request) {
     /* =========================
        1. JOB KEYWORDS
     ========================= */
-    const jobMatches: string[] = [];
+    const detected = new Set<string>();
 
-    JOB_KEYWORDS.forEach((k) => {
-      if (content.includes(k)) {
-        jobMatches.push(k);
+    for (const [group, keywords] of Object.entries(
+      JOB_KEYWORD_MAP
+    )) {
+      if (keywords.some((k) => content.includes(k))) {
+        detected.add(group);
       }
-    });
+    }
 
-    const hasLeader = LEADER_KEYWORDS.some((k) =>
-      content.includes(k)
+    const hasPlatform = PLATFORM_KEYS.some((p) =>
+      detected.has(p)
     );
 
-    const finalJobs = jobMatches.map((j) =>
-      hasLeader ? `${j} leader` : j
-    );
+    // ❌ BỎ seller nếu đã có platform
+    if (hasPlatform) {
+      detected.delete("seller");
+    }
+
+    const jobKeywords = Array.from(detected);
 
     /* =========================
        2. LOCATION
@@ -99,16 +113,22 @@ export async function POST(req: Request) {
     let city = "";
     let district = "";
 
-    CITIES.forEach((c) => {
-      if (content.includes(c)) city = c;
-    });
+    for (const c of CITIES) {
+      if (content.includes(c)) {
+        city = c;
+        break;
+      }
+    }
 
-    DISTRICTS.forEach((d) => {
-      if (content.includes(d)) district = d;
-    });
+    for (const d of DISTRICTS) {
+      if (content.includes(d)) {
+        district = d;
+        break;
+      }
+    }
 
     return NextResponse.json({
-      jobKeywords: [...new Set(finalJobs)],
+      jobKeywords,
       city,
       district,
     });

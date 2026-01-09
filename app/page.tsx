@@ -15,6 +15,48 @@ type CompanyResult = {
   jd_link?: string;
 };
 
+const JOB_KEYWORD_MAP: Record<string, string[]> = {
+  idea: ["idea"],
+
+  design: ["design", "designer"],
+
+  customer_support: ["customer support", "supporter"],
+
+  etsy: ["etsy"],
+  amazon: ["amazon"],
+  ebay: ["ebay"],
+  tiktok: ["tiktok", "tiktok shop"],
+
+  shopify: ["shopify", "website"],
+
+  facebook: [
+    "facebook",
+    "ads",
+    "marketing",
+    "digital marketing",
+    "performance",
+  ],
+
+  video: ["video", "video editor"],
+
+  seller: ["seller", "seller pod", "pod"],
+
+  fulfillment: ["fulfill", "fulfillment"],
+};
+
+function extractJobKeywords(text: string): string[] {
+  const t = text.toLowerCase();
+  const result = new Set<string>();
+
+  Object.values(JOB_KEYWORD_MAP).forEach((keywords) => {
+    keywords.forEach((k) => {
+      if (t.includes(k)) result.add(k);
+    });
+  });
+
+  return Array.from(result);
+}
+
 export default function HomePage() {
   /* =========================
      TAB
@@ -67,51 +109,107 @@ export default function HomePage() {
 
   /* =========================
      SEARCH TAB 1
-  ========================= */
-  async function handleSearchForm() {
-    setLoadingForm(true);
-    setResultsForm([]);
-    setOpenCompany(null);
+    ========================= */
+    async function handleSearchForm() {
+      setLoadingForm(true);
+      setResultsForm([]);
+      setOpenCompany(null);
 
-    try {
-      const res = await fetch("/api/search-company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city,
-          district,
-          jobKeyword,
-          companyKeyword,
-        }),
-      });
+      try {
+        const res = await fetch("/api/search-company", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            city,
+            district,
+            jobKeyword,
+            companyKeyword,
+          }),
+        });
 
-      const data = await res.json();
-      setResultsForm(data.companies || []);
-    } finally {
-      setLoadingForm(false);
+        const data = await res.json();
+        setResultsForm(data.companies || []);
+      } finally {
+        setLoadingForm(false);
+      }
     }
-  }
 
-  /* =========================
-     SEARCH TAB 2 (CV)
-  ========================= */
-  async function handleSearchCV() {
+    /* =========================
+      SEARCH TAB 2 (CV)
+    ========================= */
+    async function handleSearchCV() {
     setLoadingCV(true);
     setResultsCV([]);
     setOpenCompany(null);
 
+    let cvText = "";
+
     try {
-      const res = await fetch("/api/search-company", {
+      // =========================
+      // STEP 1: READ CV
+      // =========================
+      if (cvFile) {
+        const formData = new FormData();
+        formData.append("file", cvFile);
+
+        const resRead = await fetch("/api/read-cv", {
+          method: "POST",
+          body: formData,
+        });
+
+        const dataRead = await resRead.json();
+        cvText = dataRead.text || "";
+      } else if (cvLink) {
+        const resRead = await fetch("/api/read-cv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cvLink }),
+        });
+
+        const dataRead = await resRead.json();
+        cvText = dataRead.text || "";
+      }
+
+      if (!cvText) {
+        alert("Không đọc được nội dung CV");
+        return;
+      }
+
+      // =========================
+      // STEP 2: PARSE CV (JOB + CITY + DISTRICT)
+      // =========================
+      const resParse = await fetch("/api/parse-cv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          hasCV: true,
-          cvLink,
+          text: cvText,
         }),
       });
 
-      const data = await res.json();
-      setResultsCV(data.companies || []);
+      const parseData = await resParse.json();
+      /*
+        parseData = {
+          jobKeywords: [...],
+          city: "hà nội",
+          district: "thanh xuân"
+        }
+      */
+
+      // =========================
+      // STEP 3: SEARCH JOB
+      // =========================
+      const resSearch = await fetch("/api/search-company", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobKeywords: parseData.jobKeywords,
+          city: parseData.city,
+          district: parseData.district,
+        }),
+      });
+
+      const dataSearch = await resSearch.json();
+      setResultsCV(dataSearch.companies || []);
     } finally {
       setLoadingCV(false);
     }
@@ -176,7 +274,13 @@ export default function HomePage() {
            TAB 1
         ========================= */}
         {activeTab === "form" && (
-          <div className="space-y-5">
+          <form
+            className="space-y-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearchForm();
+            }}
+          >
             <div className="relative">
               <input
                 className={`w-full rounded-lg border px-4 py-3 ${
@@ -241,21 +345,27 @@ export default function HomePage() {
 
             <div className="flex justify-center">
               <button
-                onClick={handleSearchForm}
+                type="submit" 
                 disabled={loadingForm}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
               >
                 {loadingForm ? "Đang tra cứu..." : "Tra cứu"}
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {/* =========================
            TAB 2
         ========================= */}
         {activeTab === "cv" && (
-          <div className="space-y-4">
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearchCV();
+            }}
+          >
             <div className="border-2 border-dashed rounded-lg p-6 text-center">
               <input
                 type="file"
@@ -284,14 +394,14 @@ export default function HomePage() {
 
             <div className="flex justify-center">
               <button
-                onClick={handleSearchCV}
+                type="submit" 
                 disabled={loadingCV}
                 className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
               >
                 {loadingCV ? "Đang tra cứu..." : "Tra cứu theo CV"}
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {/* =========================
