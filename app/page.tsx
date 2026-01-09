@@ -56,6 +56,72 @@ function extractJobKeywords(text: string): string[] {
 
   return Array.from(result);
 }
+// ⭐ NEW: parse address → city + district
+function parseAddress(address: string) {
+  const text = address.toLowerCase();
+
+  const cities = [
+    "hà nội",
+    "hồ chí minh",
+    "tp hcm",
+    "tp. hcm",
+    "đà nẵng",
+    "hải phòng",
+    "cần thơ",
+  ];
+
+  const districts = [
+    "thanh xuân",
+    "cầu giấy",
+    "đống đa",
+    "hai bà trưng",
+    "hoàn kiếm",
+    "nam từ liêm",
+    "bắc từ liêm",
+    "tân bình",
+    "bình thạnh",
+    "gò vấp",
+    "thủ đức",
+    "quận 1",
+    "quận 3",
+    "quận 5",
+    "quận 7",
+    "quận 10",
+    "quận 12",
+  ];
+
+  let city = "";
+  let district = "";
+
+  for (const c of cities) {
+    if (text.includes(c)) {
+      city = c;
+      break;
+    }
+  }
+
+  for (const d of districts) {
+    if (text.includes(d)) {
+      district = d;
+      break;
+    }
+  }
+
+  return { city, district };
+}
+
+// ⭐ FORMAT TÊN ĐỊA CHỈ VIẾT HOA ĐÚNG CHUẨN
+function toTitleCaseVN(text: string) {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map(
+      (word) => word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ");
+}
 
 export default function HomePage() {
   /* =========================
@@ -68,6 +134,8 @@ export default function HomePage() {
   const [jobKeyword, setJobKeyword] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
+  // ⭐ NEW: address input (auto parse city & district)
+  const [addressInput, setAddressInput] = useState("");
 
   /* ===== AUTOCOMPLETE ===== */
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
@@ -327,6 +395,21 @@ export default function HomePage() {
               placeholder="Công việc (VD: Designer POD)"
               value={jobKeyword}
               onChange={(e) => setJobKeyword(e.target.value)}
+            />
+            {/* ⭐ NEW: Address input (auto fill city & district) */}
+            <input
+              className="w-full rounded-lg border px-4 py-3"
+              placeholder="Địa chỉ (VD: 35 Lê Văn Thiêm, Thanh Xuân, Hà Nội)"
+              value={addressInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setAddressInput(value);
+
+                const parsed = parseAddress(value);
+
+                if (parsed.city) setCity(toTitleCaseVN(parsed.city));
+                if (parsed.district) setDistrict(toTitleCaseVN(parsed.district));
+              }}
             />
 
             <input
