@@ -177,8 +177,8 @@ export async function POST(req: Request) {
       const cDistrict = normalizeDistrict(f["Quận"]);
       const cAddress = normalize(f["Địa chỉ"]);
 
-      /* ===== COMPANY ===== */
-      if (companyKeyword && !cCompany.includes(companyKeyword)) return false;
+     /* ===== COMPANY (EXACT MATCH) ===== */
+    if (companyKeyword && cCompany !== companyKeyword) return false;
 
       /* ===== VIDEO / PLATFORM RULE ===== */
 
