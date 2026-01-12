@@ -215,9 +215,13 @@ export async function POST(req: Request) {
         if (!hasFacebook && (hasGoogle || hasEmail)) return false;
       }
 
-      /* ===== LEADER ===== */
-      const jobHasLeader = hasLeader(cJob);
-      if (!cvHasLeader && jobHasLeader) return false;
+     /* ===== LEADER ===== */
+    const jobHasLeader = hasLeader(cJob);
+
+    // ✅ Chỉ lọc job Leader khi user CÓ ý định tìm job (jobKeyword hoặc CV)
+    if (jobKeywords.length > 0 && !cvHasLeader && jobHasLeader) {
+      return false;
+    }
 
       /* ===== LOCATION ===== */
       if (
