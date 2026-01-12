@@ -31,11 +31,20 @@ function normalizeDistrict(str: any): string {
 /* =========================
    LEADER KEYWORDS
 ========================= */
-const LEADER_KEYWORDS = [
-  "lead",
-  "leader",
-  "trưởng nhóm",
-  "team lead",
+const LEADER_KEYWORDS = ["lead", "leader", "trưởng nhóm", "team lead"];
+
+/* =========================
+   VIDEO / PLATFORM KEYWORDS
+========================= */
+const VIDEO_KEYWORDS = ["video", "video editor", "media", "content"];
+const PLATFORM_KEYWORDS = [
+  "etsy",
+  "amazon",
+  "ebay",
+  "shopify",
+  "tiktok",
+  "seller",
+  "pod",
 ];
 
 /* =========================
@@ -54,7 +63,7 @@ const JOB_KEYWORD_MAP = [
   },
   { keys: ["google", "google ads"], search: ["google"] },
   { keys: ["email marketing"], search: ["email"] },
-  { keys: ["video"], search: ["video"] },
+  { keys: ["video", "video editor", "media"], search: ["video", "media"] },
   { keys: ["seller pod", "pod seller"], search: ["seller pod", "seller"] },
   { keys: ["seller"], search: ["seller"] },
   {
@@ -81,16 +90,7 @@ function extractJobKeywords(text: string): string[] {
       rule.search.forEach((s) => result.add(s));
     }
   }
-
   return Array.from(result);
-}
-
-/* =========================
-   JOB KEYWORD MATCH
-========================= */
-function matchJob(jobText: string, keywords: string[]) {
-  if (keywords.length === 0) return true;
-  return keywords.some((kw) => jobText.includes(kw));
 }
 
 /* =========================
@@ -111,8 +111,7 @@ function matchLocation(
   jobAddress: string
 ) {
   const isRemote =
-    jobAddress.includes("remote") ||
-    jobAddress.includes("freelancer");
+    jobAddress.includes("remote") || jobAddress.includes("freelancer");
 
   if (isRemote) {
     if (cityCV) return jobCity.includes(cityCV);
@@ -120,19 +119,11 @@ function matchLocation(
   }
 
   if (cityCV && districtCV) {
-    return (
-      jobCity.includes(cityCV) &&
-      jobDistrict.includes(districtCV)
-    );
+    return jobCity.includes(cityCV) && jobDistrict.includes(districtCV);
   }
 
-  if (districtCV) {
-    return jobDistrict.includes(districtCV);
-  }
-
-  if (cityCV) {
-    return jobCity.includes(cityCV);
-  }
+  if (districtCV) return jobDistrict.includes(districtCV);
+  if (cityCV) return jobCity.includes(cityCV);
 
   return true;
 }
@@ -145,14 +136,11 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const companyKeyword = normalize(body.companyKeyword);
-    const jobKeyword = normalize(body.jobKeyword);
+    const jobKeyword = normalize(body.jobKeyword || "");
 
-    /* ===== USER INTENT (QUAN TRỌNG) ===== */
-    const rawJobKeyword = jobKeyword;
-
-    const intentGoogle = rawJobKeyword.includes("google");
-    const intentEmail = rawJobKeyword.includes("email");
-    const intentFacebook = rawJobKeyword.includes("facebook");
+    const intentGoogle = jobKeyword.includes("google");
+    const intentEmail = jobKeyword.includes("email");
+    const intentFacebook = jobKeyword.includes("facebook");
 
     const jobKeywordsFromCV: string[] = Array.isArray(body.jobKeywords)
       ? body.jobKeywords.map(normalize)
@@ -170,6 +158,13 @@ export async function POST(req: Request) {
       LEADER_KEYWORDS.includes(k)
     );
 
+    /* ===== VIDEO / PLATFORM INTENT ===== */
+    const hasVideoEditor = jobKeywords.includes("video editor");
+    const hasVideo = jobKeywords.some((k) => VIDEO_KEYWORDS.includes(k));
+    const hasPlatform = jobKeywords.some((k) =>
+      PLATFORM_KEYWORDS.includes(k)
+    );
+
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
@@ -185,16 +180,33 @@ export async function POST(req: Request) {
       /* ===== COMPANY ===== */
       if (companyKeyword && !cCompany.includes(companyKeyword)) return false;
 
-      /* ===== JOB KEYWORD ===== */
-      if (!matchJob(cJob, jobKeywords)) return false;
+      /* ===== VIDEO / PLATFORM RULE ===== */
 
-      /* ===== GOOGLE RULE ===== */
+      // CASE 1: video editor → chỉ search video
+      if (hasVideoEditor) {
+        if (!cJob.includes("video")) return false;
+      }
+
+      // CASE 2: video/media, không platform
+      else if (hasVideo && !hasPlatform) {
+        if (!cJob.includes("video") && !cJob.includes("media")) return false;
+      }
+
+      // CASE 3: có platform → bỏ video
+      else if (hasPlatform) {
+        const matchPlatform = PLATFORM_KEYWORDS.some(
+          (p) => jobKeywords.includes(p) && cJob.includes(p)
+        );
+        if (!matchPlatform) return false;
+      }
+
+      /* ===== GOOGLE ===== */
       if (intentGoogle && !cJob.includes("google")) return false;
 
-      /* ===== EMAIL RULE ===== */
+      /* ===== EMAIL ===== */
       if (intentEmail && !cJob.includes("email")) return false;
 
-      /* ===== FACEBOOK RULE ===== */
+      /* ===== FACEBOOK ===== */
       if (intentFacebook) {
         const hasFacebook = cJob.includes("facebook");
         const hasGoogle = cJob.includes("google");
@@ -203,7 +215,7 @@ export async function POST(req: Request) {
         if (!hasFacebook && (hasGoogle || hasEmail)) return false;
       }
 
-      /* ===== LEADER FILTER ===== */
+      /* ===== LEADER ===== */
       const jobHasLeader = hasLeader(cJob);
       if (!cvHasLeader && jobHasLeader) return false;
 
@@ -268,7 +280,6 @@ async function getTenantToken(): Promise<string> {
   if (!data?.tenant_access_token) {
     throw new Error("Cannot get tenant access token");
   }
-
   return data.tenant_access_token;
 }
 
