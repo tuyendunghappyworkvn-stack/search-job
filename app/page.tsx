@@ -206,82 +206,87 @@ export default function HomePage() {
       SEARCH TAB 2 (CV)
     ========================= */
     async function handleSearchCV() {
-    setLoadingCV(true);
-    setResultsCV([]);
-    setOpenCompany(null);
+      setLoadingCV(true);
+      setResultsCV([]);
+      setOpenCompany(null);
 
-    let cvText = "";
+      try {
+        // =========================
+        // STEP 1: SEND CV TO n8n
+        // =========================
+        let rawData: any = null;
 
-    try {
-      // =========================
-      // STEP 1: READ CV
-      // =========================
-      if (cvFile) {
-        const formData = new FormData();
-        formData.append("file", cvFile);
+        if (cvFile) {
+          const formData = new FormData();
+          formData.append("file", cvFile);
 
-        const resRead = await fetch("/api/read-cv", {
-          method: "POST",
-          body: formData,
-        });
+          const res = await fetch(
+            "https://n8n.happywork.com.vn/webhook/read-cv",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
 
-        const dataRead = await resRead.json();
-        cvText = dataRead.text || "";
-      } else if (cvLink) {
-        const resRead = await fetch("/api/read-cv", {
+          rawData = await res.json();
+        } else if (cvLink) {
+          const res = await fetch(
+            "https://n8n.happywork.com.vn/webhook/read-cv",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cvLink }),
+            }
+          );
+
+          rawData = await res.json();
+        }
+
+        if (!rawData) {
+          alert("Không nhận được dữ liệu từ CV");
+          return;
+        }
+
+        // =========================
+        // STEP 2: PARSE OUTPUT GEMINI
+        // =========================
+        const cvData =
+          typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+
+        const jobKeywords = Array.from(
+          new Set([
+            ...(cvData.desiredPosition || []),
+            ...(cvData.skills || []),
+          ])
+        );
+
+        const city = cvData.location?.city || "";
+        const district = cvData.location?.district || "";
+
+        if (jobKeywords.length === 0) {
+          alert("CV không có thông tin công việc phù hợp");
+          return;
+        }
+
+        // =========================
+        // STEP 3: SEARCH JOB
+        // =========================
+        const resSearch = await fetch("/api/search-company", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cvLink }),
+          body: JSON.stringify({
+            jobKeywords,
+            city,
+            district,
+          }),
         });
 
-        const dataRead = await resRead.json();
-        cvText = dataRead.text || "";
+        const dataSearch = await resSearch.json();
+        setResultsCV(dataSearch.companies || []);
+      } finally {
+        setLoadingCV(false);
       }
-
-      if (!cvText) {
-        alert("Không đọc được nội dung CV");
-        return;
-      }
-
-      // =========================
-      // STEP 2: PARSE CV (JOB + CITY + DISTRICT)
-      // =========================
-      const resParse = await fetch("/api/parse-cv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: cvText,
-        }),
-      });
-
-      const parseData = await resParse.json();
-      /*
-        parseData = {
-          jobKeywords: [...],
-          city: "hà nội",
-          district: "thanh xuân"
-        }
-      */
-
-      // =========================
-      // STEP 3: SEARCH JOB
-      // =========================
-      const resSearch = await fetch("/api/search-company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobKeywords: parseData.jobKeywords,
-          city: parseData.city,
-          district: parseData.district,
-        }),
-      });
-
-      const dataSearch = await resSearch.json();
-      setResultsCV(dataSearch.companies || []);
-    } finally {
-      setLoadingCV(false);
     }
-  }
 
   const results = activeTab === "form" ? resultsForm : resultsCV;
 
