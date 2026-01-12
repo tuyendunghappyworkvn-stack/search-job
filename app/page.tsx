@@ -288,15 +288,13 @@ export default function HomePage() {
       }
     }
 
-  const results = activeTab === "form" ? resultsForm : resultsCV;
-
-  const groupedByCompany = results.reduce((acc: any, item) => {
+  const groupedByCompany = resultsForm.reduce((acc: any, item) => {
     if (!acc[item.company]) acc[item.company] = [];
     acc[item.company].push(item);
     return acc;
   }, {});
 
-  const jobTextSummary = results
+  const jobTextSummary = resultsForm
     .map(
       (item, idx) =>
         `${idx + 1}) ${item.company} - ${item.job} - ${item.jd_link}`
@@ -632,7 +630,7 @@ export default function HomePage() {
         {/* =========================
            OUTPUT (CẢ 2 TAB)
         ========================= */}
-        {results.length > 0 && (
+        {activeTab === "form" && resultsForm.length > 0 && (
           <>
             <div className="relative mt-6">
               <button
@@ -650,7 +648,7 @@ export default function HomePage() {
 
               <textarea
                 readOnly
-                rows={Math.min(10, results.length + 1)}
+                rows={Math.min(10, resultsForm.length + 1)}
                 value={jobTextSummary}
                 className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
               />
