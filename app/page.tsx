@@ -365,7 +365,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* =========================
+       {/* =========================
           TAB 1
         ========================= */}
         {activeTab === "form" && (
@@ -380,7 +380,9 @@ export default function HomePage() {
               <div className="relative">
                 <input
                   className={`w-full rounded-lg border px-4 py-3 ${
-                    loadingCompanies ? "bg-gray-100 text-gray-500" : ""
+                    loadingCompanies
+                      ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                      : ""
                   }`}
                   placeholder={
                     loadingCompanies
@@ -389,14 +391,43 @@ export default function HomePage() {
                   }
                   value={companyKeyword}
                   disabled={loadingCompanies}
-                  onFocus={() =>
-                    !loadingCompanies && setShowCompanyDropdown(true)
-                  }
+                  onFocus={() => {
+                    if (!loadingCompanies) setShowCompanyDropdown(true);
+                  }}
                   onChange={(e) => setCompanyKeyword(e.target.value)}
                   onBlur={() =>
                     setTimeout(() => setShowCompanyDropdown(false), 150)
                   }
                 />
+
+                {/* 🔽 COMPANY AUTOCOMPLETE */}
+                {!loadingCompanies &&
+                  showCompanyDropdown &&
+                  filteredCompanies.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
+                      {filteredCompanies.map((company) => (
+                        <div
+                          key={company}
+                          className="px-4 py-2 text-sm cursor-pointer hover:bg-orange-50"
+                          onMouseDown={() => {
+                            setCompanyKeyword(company);
+                            setShowCompanyDropdown(false);
+                          }}
+                        >
+                          {company}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                {/* ❌ NO RESULT */}
+                {!loadingCompanies &&
+                  showCompanyDropdown &&
+                  filteredCompanies.length === 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow px-4 py-2 text-sm text-gray-500">
+                      Không tìm thấy công ty phù hợp
+                    </div>
+                  )}
               </div>
 
               <input
@@ -416,7 +447,8 @@ export default function HomePage() {
 
                   const parsed = parseAddress(value);
                   if (parsed.city) setCity(toTitleCaseVN(parsed.city));
-                  if (parsed.district) setDistrict(toTitleCaseVN(parsed.district));
+                  if (parsed.district)
+                    setDistrict(toTitleCaseVN(parsed.district));
                 }}
               />
 
