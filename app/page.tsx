@@ -145,6 +145,16 @@ export default function HomePage() {
   /* ===== TAB 2: CV ===== */
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvLink, setCvLink] = useState("");
+  const [cvProfile, setCvProfile] = useState<null | {
+    desiredPosition: string;
+    pastPositions: string;
+    skills: string;
+    city: string;
+    district: string;
+    workPreferences: string;
+    english: string;
+    achievements: string;
+  }>(null);
 
   /* ===== RESULT (TÁCH RIÊNG) ===== */
   const [resultsForm, setResultsForm] = useState<CompanyResult[]>([]);
@@ -248,25 +258,49 @@ export default function HomePage() {
         }
 
         // =========================
-        // STEP 2: PARSE OUTPUT GEMINI
+        // STEP 2: PARSE OUTPUT TỪ n8n
         // =========================
-        const cvData =
-          typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+        let cvData: any = null;
 
+        const rawText =
+          rawData?.content?.parts?.[0]?.text || "";
+
+        // remove ```json ... ```
+        const cleanText = rawText
+          .replace(/```json/i, "")
+          .replace(/```/g, "")
+          .trim();
+
+        try {
+          cvData = JSON.parse(cleanText);
+        } catch (err) {
+          console.error("Parse CV JSON failed:", cleanText);
+          alert("Không đọc được dữ liệu CV");
+          return;
+        }
+        // =========================
+        // STEP 2.1: BUILD jobKeywords FROM CV
+        // =========================
         const jobKeywords = Array.from(
           new Set([
             ...(cvData.desiredPosition || []),
+            ...(cvData.pastPositions || []),
             ...(cvData.skills || []),
           ])
-        );
+        ).map((k: string) => k.toLowerCase());
 
-        const city = cvData.location?.city || "";
-        const district = cvData.location?.district || "";
-
-        if (jobKeywords.length === 0) {
-          alert("CV không có thông tin công việc phù hợp");
-          return;
-        }
+        setCvProfile({
+          desiredPosition: (cvData.desiredPosition || []).join(", "),
+          pastPositions: (cvData.pastPositions || []).join(", "),
+          skills: (cvData.skills || []).join(", "),
+          city: cvData.location?.city || "",
+          district: cvData.location?.district || "",
+          workPreferences: cvData.workPreferences || "",
+          english: cvData.english || "",
+          achievements: Array.isArray(cvData.achievements)
+            ? cvData.achievements.join("; ")
+            : cvData.achievements || ""
+        });
 
         // =========================
         // STEP 3: SEARCH JOB
@@ -628,7 +662,7 @@ export default function HomePage() {
         )}
 
         {/* =========================
-           OUTPUT (CẢ 2 TAB)
+           OUTPUT TAB 1
         ========================= */}
         {activeTab === "form" && resultsForm.length > 0 && (
           <>
