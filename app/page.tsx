@@ -308,6 +308,28 @@ export default function HomePage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
+  /* =========================
+   RESET TAB 1
+  ========================= */
+  function resetTabForm() {
+    setCompanyKeyword("");
+    setJobKeyword("");
+    setAddressInput("");
+    setCity("");
+    setDistrict("");
+    setResultsForm([]);
+    setOpenCompany(null);
+  }
+
+  /* =========================
+    RESET TAB 2
+  ========================= */
+  function resetTabCV() {
+    setCvFile(null);
+    setCvLink("");
+    setResultsCV([]);
+    setOpenCompany(null);
+  }
 
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex items-center justify-center px-4">
@@ -344,152 +366,235 @@ export default function HomePage() {
         </div>
 
         {/* =========================
-           TAB 1
+          TAB 1
         ========================= */}
         {activeTab === "form" && (
-          <form
-            className="space-y-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSearchForm();
-            }}
-          >
-            <div className="relative">
+          <div className="relative">
+            <form
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearchForm();
+              }}
+            >
+              <div className="relative">
+                <input
+                  className={`w-full rounded-lg border px-4 py-3 ${
+                    loadingCompanies ? "bg-gray-100 text-gray-500" : ""
+                  }`}
+                  placeholder={
+                    loadingCompanies
+                      ? "Đang tải danh sách công ty..."
+                      : "Công ty (gõ để tìm)"
+                  }
+                  value={companyKeyword}
+                  disabled={loadingCompanies}
+                  onFocus={() =>
+                    !loadingCompanies && setShowCompanyDropdown(true)
+                  }
+                  onChange={(e) => setCompanyKeyword(e.target.value)}
+                  onBlur={() =>
+                    setTimeout(() => setShowCompanyDropdown(false), 150)
+                  }
+                />
+              </div>
+
               <input
-                className={`w-full rounded-lg border px-4 py-3 ${
-                  loadingCompanies ? "bg-gray-100 text-gray-500" : ""
-                }`}
-                placeholder={
-                  loadingCompanies
-                    ? "Đang tải danh sách công ty..."
-                    : "Công ty (gõ để tìm)"
-                }
-                value={companyKeyword}
-                disabled={loadingCompanies}
-                onFocus={() =>
-                  !loadingCompanies && setShowCompanyDropdown(true)
-                }
-                onChange={(e) => setCompanyKeyword(e.target.value)}
-                onBlur={() =>
-                  setTimeout(() => setShowCompanyDropdown(false), 150)
-                }
+                className="w-full rounded-lg border px-4 py-3"
+                placeholder="Công việc (VD: Designer POD)"
+                value={jobKeyword}
+                onChange={(e) => setJobKeyword(e.target.value)}
               />
 
-              {!loadingCompanies &&
-                showCompanyDropdown &&
-                filteredCompanies.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow max-h-56 overflow-auto">
-                    {filteredCompanies.map((c) => (
-                      <div
-                        key={c}
-                        className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm"
-                        onClick={() => {
-                          setCompanyKeyword(c);
-                          setShowCompanyDropdown(false);
-                        }}
-                      >
-                        {c}
-                      </div>
-                    ))}
-                  </div>
-                )}
-            </div>
+              <input
+                className="w-full rounded-lg border px-4 py-3"
+                placeholder="Địa chỉ (VD: 35 Lê Văn Thiêm, Thanh Xuân, Hà Nội)"
+                value={addressInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAddressInput(value);
 
-            <input
-              className="w-full rounded-lg border px-4 py-3"
-              placeholder="Công việc (VD: Designer POD)"
-              value={jobKeyword}
-              onChange={(e) => setJobKeyword(e.target.value)}
-            />
-            {/* ⭐ NEW: Address input (auto fill city & district) */}
-            <input
-              className="w-full rounded-lg border px-4 py-3"
-              placeholder="Địa chỉ (VD: 35 Lê Văn Thiêm, Thanh Xuân, Hà Nội)"
-              value={addressInput}
-              onChange={(e) => {
-                const value = e.target.value;
-                setAddressInput(value);
+                  const parsed = parseAddress(value);
+                  if (parsed.city) setCity(toTitleCaseVN(parsed.city));
+                  if (parsed.district) setDistrict(toTitleCaseVN(parsed.district));
+                }}
+              />
 
-                const parsed = parseAddress(value);
+              <input
+                className="w-full rounded-lg border px-4 py-3"
+                placeholder="Thành phố"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+              />
 
-                if (parsed.city) setCity(toTitleCaseVN(parsed.city));
-                if (parsed.district) setDistrict(toTitleCaseVN(parsed.district));
-              }}
-            />
+              <input
+                className="w-full rounded-lg border px-4 py-3"
+                placeholder="Quận / Huyện"
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+              />
 
-            <input
-              className="w-full rounded-lg border px-4 py-3"
-              placeholder="Thành phố"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-            />
+              <div className="flex justify-center">
+                <button
+                  type="submit"
+                  disabled={loadingForm}
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
+                >
+                  {loadingForm ? "Đang tra cứu..." : "Tra cứu"}
+                </button>
+              </div>
+            </form>
 
-            <input
-              className="w-full rounded-lg border px-4 py-3"
-              placeholder="Quận / Huyện"
-              value={district}
-              onChange={(e) => setDistrict(e.target.value)}
-            />
-
-            <div className="flex justify-center">
+            {/* 🔄 REFRESH TAB 1 */}
+            <div className="absolute bottom-3 right-3 group">
               <button
-                type="submit" 
-                disabled={loadingForm}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
+                type="button"
+                onClick={resetTabForm}
+                className="
+                  w-10 h-10
+                  flex items-center justify-center
+                  rounded-full
+                  bg-orange-50
+                  text-orange-500
+                  hover:bg-orange-500
+                  hover:text-white
+                  shadow
+                  transition
+                "
               >
-                {loadingForm ? "Đang tra cứu..." : "Tra cứu"}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M15.312 11.424a5.5 5.5 0 11-2.167-6.948l.947-.947a.75.75 0 011.28.53v3.25a.75.75 0 01-.75.75h-3.25a.75.75 0 01-.53-1.28l.885-.885a4 4 0 102.585 5.03.75.75 0 111.5.5z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </button>
+
+              <div
+                className="
+                  absolute right-12 top-1/2 -translate-y-1/2
+                  whitespace-nowrap
+                  rounded-md
+                  bg-gray-900
+                  px-2 py-1
+                  text-xs text-white
+                  opacity-0
+                  group-hover:opacity-100
+                  transition
+                "
+              >
+                Làm mới
+              </div>
             </div>
-          </form>
+          </div>
         )}
 
+
         {/* =========================
-           TAB 2
+          TAB 2
         ========================= */}
         {activeTab === "cv" && (
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSearchCV();
-            }}
-          >
-            <div className="border-2 border-dashed rounded-lg p-6 text-center">
+          <div className="relative">
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearchCV();
+              }}
+            >
+              <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) =>
+                    setCvFile(e.target.files?.[0] || null)
+                  }
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Upload file CV (PDF)
+                </p>
+              </div>
+
+              <div className="text-center text-gray-400 text-sm">HOẶC</div>
+
               <input
-                type="file"
-                accept="application/pdf"
-                onChange={(e) =>
-                  setCvFile(e.target.files?.[0] || null)
-                }
+                className="w-full rounded-lg border px-4 py-3"
+                placeholder="Dán link CV PDF"
+                value={cvLink}
+                onChange={(e) => setCvLink(e.target.value)}
               />
-              <p className="text-xs text-gray-500 mt-2">
-                Upload file CV (PDF)
+
+              <p className="text-xs text-gray-500 italic">
+                CV chỉ dùng để hỗ trợ lọc job phù hợp
               </p>
-            </div>
 
-            <div className="text-center text-gray-400 text-sm">HOẶC</div>
+              <div className="flex justify-center">
+                <button
+                  type="submit"
+                  disabled={loadingCV}
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
+                >
+                  {loadingCV ? "Đang tra cứu..." : "Tra cứu theo CV"}
+                </button>
+              </div>
+            </form>
 
-            <input
-              className="w-full rounded-lg border px-4 py-3"
-              placeholder="Dán link CV PDF"
-              value={cvLink}
-              onChange={(e) => setCvLink(e.target.value)}
-            />
-
-            <p className="text-xs text-gray-500 italic">
-              CV chỉ dùng để hỗ trợ lọc job phù hợp
-            </p>
-
-            <div className="flex justify-center">
+            {/* 🔄 REFRESH TAB 2 */}
+            <div className="absolute bottom-3 right-3 group">
               <button
-                type="submit" 
-                disabled={loadingCV}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-3 rounded-lg"
+                type="button"
+                onClick={resetTabCV}
+                className="
+                  w-10 h-10
+                  flex items-center justify-center
+                  rounded-full
+                  bg-orange-50
+                  text-orange-500
+                  hover:bg-orange-500
+                  hover:text-white
+                  shadow
+                  transition
+                "
               >
-                {loadingCV ? "Đang tra cứu..." : "Tra cứu theo CV"}
+                {/* Refresh icon */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M15.312 11.424a5.5 5.5 0 11-2.167-6.948l.947-.947a.75.75 0 011.28.53v3.25a.75.75 0 01-.75.75h-3.25a.75.75 0 01-.53-1.28l.885-.885a4 4 0 102.585 5.03.75.75 0 111.5.5z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </button>
+
+              {/* Tooltip */}
+              <div
+                className="
+                  absolute right-12 top-1/2 -translate-y-1/2
+                  whitespace-nowrap
+                  rounded-md
+                  bg-gray-900
+                  px-2 py-1
+                  text-xs text-white
+                  opacity-0
+                  group-hover:opacity-100
+                  transition
+                "
+              >
+                Làm mới
+              </div>
             </div>
-          </form>
+          </div>
         )}
 
         {/* =========================
