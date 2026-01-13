@@ -301,6 +301,24 @@ export default function HomePage() {
             ? cvData.achievements.join("; ")
             : cvData.achievements || ""
         });
+        // =========================
+        // BUILD jobKeyword (DEDUPLICATE)
+        // =========================
+        const rawJobKeywords = [
+          ...(cvData.desiredPosition || []),
+          ...(cvData.pastPositions || []),
+        ];
+
+        const uniqueJobKeywords = Array.from(
+          new Set(
+            rawJobKeywords
+              .map((k: string) => k.toLowerCase().trim())
+              .filter(Boolean)
+          )
+        );
+
+        // Chuỗi keyword giống TAB 1
+        const jobKeyword = uniqueJobKeywords.join(", ");
 
         // =========================
         // STEP 3: SEARCH JOB
@@ -309,9 +327,9 @@ export default function HomePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            jobKeywords,
-            city,
-            district,
+            jobKeyword, // 👈 dùng keyword đã dedupe
+            city: cvData.location?.city || "",
+            district: cvData.location?.district || "",
           }),
         });
 
@@ -335,11 +353,52 @@ export default function HomePage() {
     )
     .join("\n");
 
+  // ===== SUMMARY TEXT TAB 2 =====
+  const jobTextSummaryCV = resultsCV
+    .map(
+      (item, idx) =>
+        `${idx + 1}) ${item.company} - ${item.job} - ${item.jd_link}`
+    )
+    .join("\n");
+
+  const cvSummaryText = cvProfile
+  ? [
+      cvProfile.desiredPosition &&
+        `Vị trí mong muốn: ${cvProfile.desiredPosition}`,
+      cvProfile.pastPositions &&
+        `Vị trí từng làm: ${cvProfile.pastPositions}`,
+      cvProfile.skills && `Kỹ năng: ${cvProfile.skills}`,
+      cvProfile.city && `Thành phố: ${cvProfile.city}`,
+      cvProfile.district && `Quận: ${cvProfile.district}`,
+      cvProfile.workPreferences &&
+        `Hình thức làm việc: ${cvProfile.workPreferences}`,
+      cvProfile.english && `Tiếng Anh: ${cvProfile.english}`,
+      cvProfile.achievements &&
+        `Thành tích: ${cvProfile.achievements}`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+  : "";
+
   function handleCopy() {
-    navigator.clipboard.writeText(jobTextSummary);
+    const text =
+      activeTab === "form"
+        ? jobTextSummary
+        : [
+            "THÔNG TIN ỨNG VIÊN",
+            "--------------------",
+            cvSummaryText,
+            "",
+            "DANH SÁCH JOB PHÙ HỢP",
+            "--------------------",
+            jobTextSummaryCV,
+          ].join("\n");
+
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
+
   /* =========================
    RESET TAB 1
   ========================= */
@@ -748,6 +807,142 @@ export default function HomePage() {
                 )
               )}
             </div>
+          </>
+        )}
+        {/* =========================
+          OUTPUT TAB 2
+        ========================= */}
+        {activeTab === "cv" && cvProfile && (
+          <>
+            {/* ===== CV SUMMARY (TABLE) ===== */}
+            <div className="mt-6 border rounded-xl overflow-hidden">
+              <div className="bg-gray-100 px-4 py-3 font-semibold">
+                📄 Thông tin ứng viên
+              </div>
+
+              <div className="divide-y text-sm">
+                {[
+                  ["Vị trí mong muốn", cvProfile.desiredPosition],
+                  ["Vị trí từng làm", cvProfile.pastPositions],
+                  ["Kỹ năng", cvProfile.skills],
+                  ["Thành phố", cvProfile.city],
+                  ["Quận", cvProfile.district],
+                  ["Hình thức làm việc", cvProfile.workPreferences],
+                  ["Tiếng Anh", cvProfile.english],
+                  ["Thành tích", cvProfile.achievements],
+                ]
+                  .filter(([, value]) => value)
+                  .map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="grid grid-cols-[180px_1fr] gap-4 px-4 py-3 items-start"
+                    >
+                      {/* LABEL */}
+                      <div className="font-semibold text-gray-800">
+                        {label}
+                      </div>
+
+                      {/* VALUE */}
+                      <div className="text-gray-900">
+                        {typeof value === "string"
+                          ? value.charAt(0).toUpperCase() + value.slice(1)
+                          : value}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            {/* ===== COPY JOB LIST (TEXT) ===== */}
+            {resultsCV.length > 0 && (
+              <div className="relative mt-6">
+                <button
+                  onClick={handleCopy}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
+                  title="Copy danh sách job"
+                >
+                  📋
+                </button>
+
+                {copied && (
+                  <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
+                    Đã sao chép
+                  </div>
+                )}
+
+                <textarea
+                  readOnly
+                  rows={Math.min(10, resultsCV.length + 2)}
+                  value={jobTextSummaryCV}
+                  className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
+                />
+              </div>
+            )}
+
+            {/* ===== JOB RESULT ===== */}
+            {resultsCV.length > 0 && (
+              <div className="pt-6 border rounded-lg overflow-hidden mt-4">
+                {Object.entries(
+                  resultsCV.reduce((acc: any, item) => {
+                    if (!acc[item.company]) acc[item.company] = [];
+                    acc[item.company].push(item);
+                    return acc;
+                  }, {})
+                ).map(([company, jobs]: any) => (
+                  <div key={company}>
+                    <button
+                      onClick={() =>
+                        setOpenCompany(
+                          openCompany === company ? null : company
+                        )
+                      }
+                      className="w-full flex justify-between items-center px-4 py-2 text-left bg-white hover:bg-orange-50 border-b"
+                    >
+                      <span className="font-medium">{company}</span>
+                      <span className="text-xs text-gray-500">
+                        {jobs.length} vị trí
+                      </span>
+                    </button>
+
+                    {openCompany === company && (
+                      <div className="bg-orange-50 px-4 py-3 space-y-2">
+                        {jobs.map((job: CompanyResult, idx: number) => (
+                          <div
+                            key={idx}
+                            className="bg-white rounded-md p-3 text-sm space-y-1"
+                          >
+                            <p className="font-medium">{job.job}</p>
+
+                            {job.salary_min && job.salary_max && (
+                              <p>
+                                - Mức lương:{" "}
+                                {Number(job.salary_min).toLocaleString()} –{" "}
+                                {Number(job.salary_max).toLocaleString()}
+                              </p>
+                            )}
+
+                            {job.working_time && (
+                              <p>- Thời gian làm việc: {job.working_time}</p>
+                            )}
+
+                            <p>- Địa chỉ: {job.address}</p>
+
+                            {job.jd_link && (
+                              <a
+                                href={job.jd_link}
+                                target="_blank"
+                                className="text-orange-600 underline"
+                              >
+                                Xem JD
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
