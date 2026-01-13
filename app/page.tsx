@@ -455,6 +455,98 @@ export default function HomePage() {
     setTimeout(() => setCopied(false), 1500);
   }
 
+  // =========================
+  // SPLIT JOBS: REMOTE vs OFFLINE
+  // =========================
+  const remoteKeywords = ["remote", "freelancer", "online"];
+
+  const isRemoteJob = (job: CompanyResult) => {
+    const address = (job.address || "").toLowerCase();
+    return remoteKeywords.some((k) => address.includes(k));
+  };
+
+  const remoteJobs = resultsCV.filter(isRemoteJob);
+  const offlineJobs = resultsCV.filter((job) => !isRemoteJob(job));
+
+  function renderJobGroup(
+    title: string,
+    jobs: CompanyResult[]
+  ) {
+    if (jobs.length === 0) return null;
+
+    const grouped = jobs.reduce((acc: any, item) => {
+      if (!acc[item.company]) acc[item.company] = [];
+      acc[item.company].push(item);
+      return acc;
+    }, {});
+
+    return (
+      <div className="mt-6">
+        {/* TITLE */}
+        <div className="mb-3 font-semibold text-gray-900">
+          📌 {title}
+        </div>
+
+        <div className="border rounded-lg overflow-hidden">
+          {Object.entries(grouped).map(([company, jobs]: any) => (
+            <div key={company}>
+              <button
+                onClick={() =>
+                  setOpenCompany(
+                    openCompany === company ? null : company
+                  )
+                }
+                className="w-full flex justify-between items-center px-4 py-2 text-left bg-white hover:bg-orange-50 border-b"
+              >
+                <span className="font-medium">{company}</span>
+                <span className="text-xs text-gray-500">
+                  {jobs.length} vị trí
+                </span>
+              </button>
+
+              {openCompany === company && (
+                <div className="bg-orange-50 px-4 py-3 space-y-2">
+                  {jobs.map((job: CompanyResult, idx: number) => (
+                    <div
+                      key={idx}
+                      className="bg-white rounded-md p-3 text-sm space-y-1"
+                    >
+                      <p className="font-medium">{job.job}</p>
+
+                      {job.salary_min && job.salary_max && (
+                        <p>
+                          - Mức lương:{" "}
+                          {Number(job.salary_min).toLocaleString()} –{" "}
+                          {Number(job.salary_max).toLocaleString()}
+                        </p>
+                      )}
+
+                      {job.working_time && (
+                        <p>- Thời gian làm việc: {job.working_time}</p>
+                      )}
+
+                      <p>- Địa chỉ: {job.address}</p>
+
+                      {job.jd_link && (
+                        <a
+                          href={job.jd_link}
+                          target="_blank"
+                          className="text-orange-600 underline"
+                        >
+                          Xem JD
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   /* =========================
    RESET TAB 1
   ========================= */
@@ -1002,69 +1094,18 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* ===== JOB RESULT ===== */}
+            {/* ===== JOB RESULT (REMOTE / OFFLINE) ===== */}
             {resultsCV.length > 0 ? (
-              <div className="pt-6 border rounded-lg overflow-hidden mt-4">
-                {Object.entries(
-                  resultsCV.reduce((acc: any, item) => {
-                    if (!acc[item.company]) acc[item.company] = [];
-                    acc[item.company].push(item);
-                    return acc;
-                  }, {})
-                ).map(([company, jobs]: any) => (
-                  <div key={company}>
-                    <button
-                      onClick={() =>
-                        setOpenCompany(
-                          openCompany === company ? null : company
-                        )
-                      }
-                      className="w-full flex justify-between items-center px-4 py-2 text-left bg-white hover:bg-orange-50 border-b"
-                    >
-                      <span className="font-medium">{company}</span>
-                      <span className="text-xs text-gray-500">
-                        {jobs.length} vị trí
-                      </span>
-                    </button>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ===== OFFLINE JOBS ===== */}
+                <div>
+                  {renderJobGroup("Danh sách job offline", offlineJobs)}
+                </div>
 
-                    {openCompany === company && (
-                      <div className="bg-orange-50 px-4 py-3 space-y-2">
-                        {jobs.map((job: CompanyResult, idx: number) => (
-                          <div
-                            key={idx}
-                            className="bg-white rounded-md p-3 text-sm space-y-1"
-                          >
-                            <p className="font-medium">{job.job}</p>
-
-                            {job.salary_min && job.salary_max && (
-                              <p>
-                                - Mức lương:{" "}
-                                {Number(job.salary_min).toLocaleString()} –{" "}
-                                {Number(job.salary_max).toLocaleString()}
-                              </p>
-                            )}
-
-                            {job.working_time && (
-                              <p>- Thời gian làm việc: {job.working_time}</p>
-                            )}
-
-                            <p>- Địa chỉ: {job.address}</p>
-
-                            {job.jd_link && (
-                              <a
-                                href={job.jd_link}
-                                target="_blank"
-                                className="text-orange-600 underline"
-                              >
-                                Xem JD
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {/* ===== REMOTE JOBS ===== */}
+                <div>
+                  {renderJobGroup("Danh sách job remote", remoteJobs)}
+                </div>
               </div>
             ) : (
               hasSearchedCV &&
