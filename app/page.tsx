@@ -853,33 +853,33 @@ export default function HomePage() {
               </div>
             </div>
             {/* ===== COPY JOB LIST (TEXT) ===== */}
-            {resultsCV.length > 0 && (
-              <div className="relative mt-6">
-                <button
-                  onClick={handleCopy}
-                  className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
-                  title="Copy danh sách job"
-                >
-                  📋
-                </button>
+          {resultsCV.length > 0 && (
+            <div className="relative mt-6">
+              <button
+                onClick={handleCopy}
+                className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
+                title="Copy danh sách job"
+              >
+                📋
+              </button>
 
-                {copied && (
-                  <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
-                    Đã sao chép
-                  </div>
-                )}
+              {copied && (
+                <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
+                  Đã sao chép
+                </div>
+              )}
 
-                <textarea
-                  readOnly
-                  rows={Math.min(10, resultsCV.length + 2)}
-                  value={jobTextSummaryCV}
-                  className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
-                />
-              </div>
-            )}
+              <textarea
+                readOnly
+                rows={Math.min(10, resultsCV.length + 2)}
+                value={jobTextSummaryCV}
+                className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
+              />
+            </div>
+          )}
 
             {/* ===== JOB RESULT ===== */}
-            {resultsCV.length > 0 && (
+            {resultsCV.length > 0 ? (
               <div className="pt-6 border rounded-lg overflow-hidden mt-4">
                 {Object.entries(
                   resultsCV.reduce((acc: any, item) => {
@@ -941,6 +941,10 @@ export default function HomePage() {
                     )}
                   </div>
                 ))}
+              </div>
+            ) : (
+              <div className="mt-4 border border-dashed rounded-lg p-6 text-center text-gray-500 text-sm">
+                ❌ Chưa có job phù hợp
               </div>
             )}
           </>
