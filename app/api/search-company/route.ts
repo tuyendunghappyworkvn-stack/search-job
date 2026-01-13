@@ -29,80 +29,38 @@ function normalizeDistrict(str: any): string {
 }
 
 /* =========================
-   LEADER KEYWORDS
+   KEYWORDS CONFIG
 ========================= */
 const LEADER_KEYWORDS = ["lead", "leader", "trưởng nhóm", "team lead"];
 
-/* =========================
-   VIDEO / PLATFORM KEYWORDS
-========================= */
-const VIDEO_KEYWORDS = ["video", "video editor", "media", "content"];
-const PLATFORM_KEYWORDS = [
+const PLATFORMS = [
   "etsy",
   "amazon",
   "ebay",
-  "shopify",
   "tiktok",
-  "seller",
-  "pod",
+  "shopify",
+  "facebook",
 ];
 
-/* =========================
-   JOB KEYWORD MAP
-========================= */
-const JOB_KEYWORD_MAP = [
-  { keys: ["design", "designer"], search: ["design", "designer"] },
-  { keys: ["etsy"], search: ["etsy"] },
-  { keys: ["amazon"], search: ["amazon"] },
-  { keys: ["ebay"], search: ["ebay"] },
-  { keys: ["tiktok"], search: ["tiktok"] },
-  { keys: ["shopify", "website", "web"], search: ["shopify"] },
-  {
-    keys: ["facebook", "ads", "marketing", "digital", "performance"],
-    search: ["facebook", "ads", "marketing", "digital", "performance"],
-  },
-  { keys: ["google", "google ads"], search: ["google"] },
-  { keys: ["email marketing"], search: ["email"] },
-  { keys: ["video", "video editor", "media"], search: ["video", "media"] },
-  { keys: ["seller pod", "pod seller"], search: ["seller pod", "seller"] },
-  { keys: ["seller"], search: ["seller"] },
-  {
-    keys: ["fulfill", "fulfillment"],
-    search: ["fulfillment", "support fulfill"],
-  },
-  {
-    keys: ["customer support", "supporter"],
-    search: ["customer support", "supporter"],
-  },
-  { keys: ["idea"], search: ["idea"] },
-];
+const SPECIAL_GROUPS = {
+  video: ["video", "media"],
+  design: ["design", "designer"],
+  support: ["support", "customer support", "supporter"],
+  fulfill: ["fulfill", "fulfillment"],
+  marketing: ["facebook", "marketing", "performance", "digital"],
+};
 
 /* =========================
-   EXTRACT JOB KEYWORDS
+   HELPERS
 ========================= */
-function extractJobKeywords(text: string): string[] {
-  if (!text) return [];
-  const t = text.toLowerCase();
-  const result = new Set<string>();
-
-  for (const rule of JOB_KEYWORD_MAP) {
-    if (rule.keys.some((k) => t.includes(k))) {
-      rule.search.forEach((s) => result.add(s));
-    }
-  }
-  return Array.from(result);
+function hasAny(text: string, keywords: string[]) {
+  return keywords.some((k) => text.includes(k));
 }
 
-/* =========================
-   LEADER CHECK
-========================= */
-function hasLeader(text: string) {
-  return LEADER_KEYWORDS.some((k) => text.includes(k));
+function extractPlatform(keyword: string) {
+  return PLATFORMS.find((p) => keyword.includes(p)) || null;
 }
 
-/* =========================
-   LOCATION MATCH
-========================= */
 function matchLocation(
   cityCV: string,
   districtCV: string,
@@ -127,6 +85,89 @@ function matchLocation(
 
   return true;
 }
+/* =========================
+   RULE SEARCH
+========================= */
+function matchJob(
+  r: any,
+  jobKeyword: string,
+  companyKeyword: string,
+  cityN: string,
+  districtN: string
+) {
+  const f = r.fields || {};
+
+  const cCompany = normalize(f["Công ty"]);
+  const cJob = normalize(f["Công việc"]);
+  const cCity = normalize(f["Thành phố"]);
+  const cDistrict = normalizeDistrict(f["Quận"]);
+  const cAddress = normalize(f["Địa chỉ"]);
+
+  const isSeller = jobKeyword.includes("seller");
+  const isLeader = hasAny(jobKeyword, LEADER_KEYWORDS);
+  const platform = extractPlatform(jobKeyword);
+
+  /* ===== COMPANY (chỉ lọc khi có companyKeyword thật) ===== */
+  if (companyKeyword && companyKeyword.length > 0) {
+    if (cCompany !== companyKeyword) return false;
+  }
+
+  /* ===== LOCATION ===== */
+  // 👉 chỉ lọc location khi CV có city hoặc district
+  if (cityN || districtN) {
+    if (
+      !matchLocation(
+        cityN,
+        districtN,
+        cCity,
+        cDistrict,
+        cAddress
+      )
+    ) {
+      return false;
+    }
+  }
+
+  /* ===== LEADER ===== */
+  if (isLeader && !hasAny(cJob, LEADER_KEYWORDS)) return false;
+
+  /* ===== SELLER + PLATFORM ===== */
+  if (isSeller && platform) {
+    return cJob.includes(platform);
+  }
+
+  /* ===== SELLER POD ===== */
+  if (jobKeyword.includes("seller pod")) {
+    return cJob.includes("seller");
+  }
+
+  /* ===== SELLER ONLY ===== */
+  if (isSeller) {
+    return cJob.includes("seller");
+  }
+
+  /* ===== LEAD POD ===== */
+  if (jobKeyword.includes("lead pod")) {
+    return (
+      hasAny(cJob, LEADER_KEYWORDS) &&
+      hasAny(cJob, PLATFORMS)
+    );
+  }
+
+  /* ===== SPECIAL GROUPS ===== */
+  for (const group of Object.values(SPECIAL_GROUPS)) {
+    if (hasAny(jobKeyword, group)) {
+      return hasAny(cJob, group);
+    }
+  }
+
+  /* ===== DEFAULT ===== */
+  if (!jobKeyword) return true;
+
+  return jobKeyword
+    .split(" ")
+    .some((k) => cJob.includes(k));
+}
 
 /* =========================
    POST: SEARCH
@@ -135,112 +176,53 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    const rawJobKeyword = body.jobKeyword || "";
+
+    const jobKeywords = rawJobKeyword
+      .split(",")
+      .map((k: string) => normalize(k))
+      .filter(Boolean); // bỏ keyword rỗng
+      // 👉 TAB 2: nếu không có job keyword thì vẫn search (bỏ qua điều kiện job)
+    if (jobKeywords.length === 0) {
+      jobKeywords.push("");
+    }
+
     const companyKeyword = normalize(body.companyKeyword);
-    const jobKeyword = normalize(body.jobKeyword || "");
-
-    const intentGoogle = jobKeyword.includes("google");
-    const intentEmail = jobKeyword.includes("email");
-    const intentFacebook = jobKeyword.includes("facebook");
-
-    const jobKeywordsFromCV: string[] = Array.isArray(body.jobKeywords)
-      ? body.jobKeywords.map(normalize)
-      : [];
-
     const cityN = normalize(body.city);
     const districtN = normalizeDistrict(body.district);
 
-    const jobKeywords =
-      jobKeywordsFromCV.length > 0
-        ? jobKeywordsFromCV
-        : extractJobKeywords(jobKeyword);
-
-    const cvHasLeader = jobKeywords.some((k) =>
-      LEADER_KEYWORDS.includes(k)
-    );
-
-    /* ===== VIDEO / PLATFORM INTENT ===== */
-    const hasVideoEditor = jobKeywords.includes("video editor");
-    const hasVideo = jobKeywords.some((k) => VIDEO_KEYWORDS.includes(k));
-    const hasPlatform = jobKeywords.some((k) =>
-      PLATFORM_KEYWORDS.includes(k)
-    );
 
     const token = await getTenantToken();
     const records = await getAllRecords(token);
 
-    const results = records.filter((r) => {
-      const f = r.fields || {};
+    /* =========================
+      CORE FILTER (MULTI KEYWORD)
+    ========================= */
 
-      const cCompany = normalize(f["Công ty"]);
-      const cJob = normalize(f["Công việc"]);
-      const cCity = normalize(f["Thành phố"]);
-      const cDistrict = normalizeDistrict(f["Quận"]);
-      const cAddress = normalize(f["Địa chỉ"]);
+    let results: any[] = [];
 
-     /* ===== COMPANY (EXACT MATCH) ===== */
-    if (companyKeyword && cCompany !== companyKeyword) return false;
+    for (const keyword of jobKeywords) {
+      const matched = records.filter((r) =>
+        matchJob(
+          r,
+          keyword,
+          companyKeyword,
+          cityN,
+          districtN
+        )
+      );
 
-      /* ===== VIDEO / PLATFORM RULE ===== */
-
-      // CASE 1: video editor → chỉ search video
-      if (hasVideoEditor) {
-        if (!cJob.includes("video")) return false;
-      }
-
-      // CASE 2: video/media, không platform
-      else if (hasVideo && !hasPlatform) {
-        if (!cJob.includes("video") && !cJob.includes("media")) return false;
-      }
-
-      // CASE 3: có platform → bỏ video
-      else if (hasPlatform) {
-        const matchPlatform = PLATFORM_KEYWORDS.some(
-          (p) => jobKeywords.includes(p) && cJob.includes(p)
-        );
-        if (!matchPlatform) return false;
-      }
-
-      /* ===== GOOGLE ===== */
-      if (intentGoogle && !cJob.includes("google")) return false;
-
-      /* ===== EMAIL ===== */
-      if (intentEmail && !cJob.includes("email")) return false;
-
-      /* ===== FACEBOOK ===== */
-      if (intentFacebook) {
-        const hasFacebook = cJob.includes("facebook");
-        const hasGoogle = cJob.includes("google");
-        const hasEmail = cJob.includes("email");
-
-        if (!hasFacebook && (hasGoogle || hasEmail)) return false;
-      }
-
-     /* ===== LEADER ===== */
-    const jobHasLeader = hasLeader(cJob);
-
-    // ✅ Chỉ lọc job Leader khi user CÓ ý định tìm job (jobKeyword hoặc CV)
-    if (jobKeywords.length > 0 && !cvHasLeader && jobHasLeader) {
-      return false;
+      results = results.concat(matched);
     }
 
-      /* ===== LOCATION ===== */
-      if (
-        !matchLocation(
-          cityN,
-          districtN,
-          cCity,
-          cDistrict,
-          cAddress
-        )
-      )
-        return false;
-
-      return true;
-    });
+    // remove duplicate jobs
+    const uniqueResults = Array.from(
+      new Map(results.map((r) => [r.record_id, r])).values()
+    );
 
     return NextResponse.json({
-      total: results.length,
-      companies: results.map((r) => {
+      total: uniqueResults.length,
+      companies: uniqueResults.map((r) => {
         const f = r.fields || {};
         return {
           company: f["Công ty"] || "",

@@ -123,6 +123,12 @@ function toTitleCaseVN(text: string) {
     .join(" ");
 }
 
+// ⭐ CHỈ dùng để hiển thị UI – KHÔNG ảnh hưởng search
+function capitalizeFirst(text?: string) {
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export default function HomePage() {
   /* =========================
      TAB
@@ -155,6 +161,7 @@ export default function HomePage() {
     english: string;
     achievements: string;
   }>(null);
+  const [cvInputKey, setCvInputKey] = useState(0);
 
   /* ===== RESULT (TÁCH RIÊNG) ===== */
   const [resultsForm, setResultsForm] = useState<CompanyResult[]>([]);
@@ -162,6 +169,8 @@ export default function HomePage() {
 
   const [loadingForm, setLoadingForm] = useState(false);
   const [loadingCV, setLoadingCV] = useState(false);
+  const [hasSearchedForm, setHasSearchedForm] = useState(false);
+  const [hasSearchedCV, setHasSearchedCV] = useState(false);
 
   const [openCompany, setOpenCompany] = useState<string | null>(null);
 
@@ -207,8 +216,10 @@ export default function HomePage() {
 
         const data = await res.json();
         setResultsForm(data.companies || []);
+        setHasSearchedForm(true);  
       } finally {
         setLoadingForm(false);
+        setHasSearchedForm(true);
       }
     }
 
@@ -217,6 +228,7 @@ export default function HomePage() {
     ========================= */
     async function handleSearchCV() {
       setLoadingCV(true);
+      setHasSearchedCV(false);  
       setResultsCV([]);
       setOpenCompany(null);
 
@@ -335,6 +347,7 @@ export default function HomePage() {
 
         const dataSearch = await resSearch.json();
         setResultsCV(dataSearch.companies || []);
+        setHasSearchedCV(true);  
       } finally {
         setLoadingCV(false);
       }
@@ -410,6 +423,7 @@ export default function HomePage() {
     setDistrict("");
     setResultsForm([]);
     setOpenCompany(null);
+    setHasSearchedForm(false);
   }
 
   /* =========================
@@ -418,9 +432,13 @@ export default function HomePage() {
   function resetTabCV() {
     setCvFile(null);
     setCvLink("");
+    setCvProfile(null);      // 👈 reset CV summary
     setResultsCV([]);
     setOpenCompany(null);
+    setCvInputKey((k) => k + 1); // 👈 reset file input
+    setHasSearchedCV(false);
   }
+
 
   return (
     <div className="min-h-screen bg-[#FFF7ED] flex items-center justify-center px-4">
@@ -633,6 +651,7 @@ export default function HomePage() {
             >
               <div className="border-2 border-dashed rounded-lg p-6 text-center">
                 <input
+                  key={cvInputKey}
                   type="file"
                   accept="application/pdf"
                   onChange={(e) =>
@@ -809,6 +828,14 @@ export default function HomePage() {
             </div>
           </>
         )}
+        {activeTab === "form" &&
+          hasSearchedForm &&
+          !loadingForm &&
+          resultsForm.length === 0 && (
+            <div className="mt-6 border border-dashed rounded-lg p-6 text-center text-gray-500 text-sm">
+              ❌ Chưa có job phù hợp
+            </div>
+        )}
         {/* =========================
           OUTPUT TAB 2
         ========================= */}
@@ -845,7 +872,9 @@ export default function HomePage() {
                       {/* VALUE */}
                       <div className="text-gray-900">
                         {typeof value === "string"
-                          ? value.charAt(0).toUpperCase() + value.slice(1)
+                          ? label === "Thành phố" || label === "Quận"
+                            ? toTitleCaseVN(value)
+                            : capitalizeFirst(value)
                           : value}
                       </div>
                     </div>
@@ -943,9 +972,12 @@ export default function HomePage() {
                 ))}
               </div>
             ) : (
-              <div className="mt-4 border border-dashed rounded-lg p-6 text-center text-gray-500 text-sm">
-                ❌ Chưa có job phù hợp
-              </div>
+              hasSearchedCV &&
+              !loadingCV && (
+                <div className="mt-4 border border-dashed rounded-lg p-6 text-center text-gray-500 text-sm">
+                  ❌ Chưa có job phù hợp
+                </div>
+              )
             )}
           </>
         )}
