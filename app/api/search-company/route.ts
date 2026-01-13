@@ -153,6 +153,14 @@ function matchJob(
       hasAny(cJob, PLATFORMS)
     );
   }
+  /* ===== EMAIL MARKETING (STRICT) ===== */
+  const isEmailJob =
+    cJob.includes("email marketing") ||
+    (cJob.includes("email") && cJob.includes("marketing"));
+
+  if (isEmailJob && !jobKeyword.includes("email")) {
+    return false;
+  }
 
   /* ===== SPECIAL GROUPS ===== */
   for (const group of Object.values(SPECIAL_GROUPS)) {

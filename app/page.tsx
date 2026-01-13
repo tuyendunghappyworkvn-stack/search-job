@@ -129,6 +129,34 @@ function capitalizeFirst(text?: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function normalizeText(value: any) {
+  if (!value) return "";
+
+  if (Array.isArray(value)) {
+    return capitalizeFirst(value.join(", "));
+  }
+
+  if (typeof value === "string") {
+    return capitalizeFirst(value);
+  }
+
+  return "";
+}
+
+// ⭐ STYLE CHUNG CHO INPUT EDIT CV (UI ONLY)
+const editableInputClass = `
+  w-full px-3 py-2 text-sm
+  rounded-md
+  bg-white
+  border border-gray-200
+  cursor-text
+  transition
+  hover:border-gray-300
+  focus:border-orange-400
+  focus:ring-1 focus:ring-orange-200
+  focus:outline-none
+`;
+
 export default function HomePage() {
   /* =========================
      TAB
@@ -293,44 +321,29 @@ export default function HomePage() {
         // =========================
         // STEP 2.1: BUILD jobKeywords FROM CV
         // =========================
-        const jobKeywords = Array.from(
-          new Set([
-            ...(cvData.desiredPosition || []),
-            ...(cvData.pastPositions || []),
-            ...(cvData.skills || []),
-          ])
-        ).map((k: string) => k.toLowerCase());
+        const rawKeywordText = [
+          cvData.desiredPosition,
+          cvData.pastPositions,
+          cvData.skills,
+        ]
+          .filter(Boolean)
+          .join(", ")
+          .toLowerCase();
+
+        const jobKeyword = rawKeywordText;
 
         setCvProfile({
-          desiredPosition: (cvData.desiredPosition || []).join(", "),
-          pastPositions: (cvData.pastPositions || []).join(", "),
-          skills: (cvData.skills || []).join(", "),
-          city: cvData.location?.city || "",
-          district: cvData.location?.district || "",
-          workPreferences: cvData.workPreferences || "",
-          english: cvData.english || "",
-          achievements: Array.isArray(cvData.achievements)
-            ? cvData.achievements.join("; ")
-            : cvData.achievements || ""
+          desiredPosition: normalizeText(cvData.desiredPosition),
+          pastPositions: normalizeText(cvData.pastPositions),
+          skills: normalizeText(cvData.skills),
+
+          city: toTitleCaseVN(cvData.location?.city || ""),
+          district: toTitleCaseVN(cvData.location?.district || ""),
+
+          workPreferences: normalizeText(cvData.workPreferences),
+          english: normalizeText(cvData.english),
+          achievements: normalizeText(cvData.achievements),
         });
-        // =========================
-        // BUILD jobKeyword (DEDUPLICATE)
-        // =========================
-        const rawJobKeywords = [
-          ...(cvData.desiredPosition || []),
-          ...(cvData.pastPositions || []),
-        ];
-
-        const uniqueJobKeywords = Array.from(
-          new Set(
-            rawJobKeywords
-              .map((k: string) => k.toLowerCase().trim())
-              .filter(Boolean)
-          )
-        );
-
-        // Chuỗi keyword giống TAB 1
-        const jobKeyword = uniqueJobKeywords.join(", ");
 
         // =========================
         // STEP 3: SEARCH JOB
@@ -348,6 +361,36 @@ export default function HomePage() {
         const dataSearch = await resSearch.json();
         setResultsCV(dataSearch.companies || []);
         setHasSearchedCV(true);  
+      } finally {
+        setLoadingCV(false);
+      }
+    }
+    async function handleResearchFromCV() {
+      if (!cvProfile) return;
+
+      setLoadingCV(true);
+      setResultsCV([]);
+      setOpenCompany(null);
+
+      try {
+        const res = await fetch("/api/search-company", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobKeyword: [
+              cvProfile.desiredPosition,
+              cvProfile.pastPositions,
+            ]
+              .filter(Boolean)
+              .join(", "),
+            city: cvProfile.city || "",
+            district: cvProfile.district || "",
+          }),
+        });
+
+        const data = await res.json();
+        setResultsCV(data.companies || []);
+        setHasSearchedCV(true);
       } finally {
         setLoadingCV(false);
       }
@@ -849,63 +892,115 @@ export default function HomePage() {
 
               <div className="divide-y text-sm">
                 {[
-                  ["Vị trí mong muốn", cvProfile.desiredPosition],
-                  ["Vị trí từng làm", cvProfile.pastPositions],
-                  ["Kỹ năng", cvProfile.skills],
-                  ["Thành phố", cvProfile.city],
-                  ["Quận", cvProfile.district],
-                  ["Hình thức làm việc", cvProfile.workPreferences],
-                  ["Tiếng Anh", cvProfile.english],
-                  ["Thành tích", cvProfile.achievements],
-                ]
-                  .filter(([, value]) => value)
-                  .map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="grid grid-cols-[180px_1fr] gap-4 px-4 py-3 items-start"
-                    >
-                      {/* LABEL */}
-                      <div className="font-semibold text-gray-800">
-                        {label}
-                      </div>
-
-                      {/* VALUE */}
-                      <div className="text-gray-900">
-                        {typeof value === "string"
-                          ? label === "Thành phố" || label === "Quận"
-                            ? toTitleCaseVN(value)
-                            : capitalizeFirst(value)
-                          : value}
-                      </div>
+                  ["Vị trí mong muốn", "desiredPosition"],
+                  ["Vị trí từng làm", "pastPositions"],
+                  ["Kỹ năng", "skills"],
+                  ["Thành phố", "city"],
+                  ["Quận", "district"],
+                  ["Hình thức làm việc", "workPreferences"],
+                  ["Tiếng Anh", "english"],
+                  ["Thành tích", "achievements"],
+                ].map(([label, key]) => (
+                  <div
+                    key={key}
+                    className="grid grid-cols-[180px_1fr] gap-4 px-4 py-3 items-start"
+                  >
+                    {/* LABEL */}
+                    <div className="font-semibold text-gray-800">
+                      {label}
                     </div>
-                  ))}
+
+                    {/* VALUE – EDITABLE */}
+                    <div>
+                      {key === "achievements" ? (
+                        <textarea
+                          className={editableInputClass}
+                          rows={3}
+                          value={(cvProfile as any)[key]}
+                          onChange={(e) =>
+                            setCvProfile((prev) =>
+                              prev
+                                ? { ...prev, [key]: e.target.value }
+                                : prev
+                            )
+                          }
+                        />
+                      ) : (
+                        <input
+                          className={editableInputClass}
+                          value={(cvProfile as any)[key]}
+                          onChange={(e) =>
+                            setCvProfile((prev) =>
+                              prev ? { ...prev, [key]: e.target.value } : prev
+                            )
+                          }
+                          onBlur={(e) => {
+                            if (key === "city" || key === "district") {
+                              setCvProfile((prev) =>
+                                prev
+                                  ? { ...prev, [key]: toTitleCaseVN(e.target.value) }
+                                  : prev
+                              );
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            {/* ===== COPY JOB LIST (TEXT) ===== */}
-          {resultsCV.length > 0 && (
-            <div className="relative mt-6">
+            {/* 🔁 RE-SEARCH BUTTON */}
+            <div className="mt-4 flex justify-center">
               <button
-                onClick={handleCopy}
-                className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
-                title="Copy danh sách job"
+                onClick={handleResearchFromCV}
+                disabled={loadingCV}
+                className="
+                  px-4 py-2
+                  text-sm font-medium
+                  rounded-md
+                  border border-orange-200
+                  text-orange-600
+                  hover:bg-orange-50
+                  disabled:opacity-50
+                "
               >
-                📋
+                {loadingCV ? "Đang tra cứu..." : "Tra cứu lại"}
               </button>
-
-              {copied && (
-                <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
-                  Đã sao chép
-                </div>
-              )}
-
-              <textarea
-                readOnly
-                rows={Math.min(10, resultsCV.length + 2)}
-                value={jobTextSummaryCV}
-                className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
-              />
             </div>
-          )}
+
+            {/* ===== COPY JOB LIST (TEXT) ===== */}
+            {resultsCV.length > 0 && (
+              <div className="mt-6">
+                {/* ===== TITLE ===== */}
+                <div className="mb-2 font-semibold text-gray-900">
+                  📌 Danh sách job phù hợp
+                </div>
+
+                <div className="relative">
+                  <button
+                    onClick={handleCopy}
+                    className="absolute top-2 right-2 text-gray-500 hover:text-orange-600"
+                    title="Copy danh sách job"
+                  >
+                    📋
+                  </button>
+
+                  {copied && (
+                    <div className="absolute top-2 right-10 text-xs bg-black text-white px-2 py-1 rounded">
+                      Đã sao chép
+                    </div>
+                  )}
+
+                  <textarea
+                    readOnly
+                    rows={Math.min(10, resultsCV.length + 2)}
+                    value={jobTextSummaryCV}
+                    className="w-full rounded-lg border bg-gray-50 p-3 text-sm"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ===== JOB RESULT ===== */}
             {resultsCV.length > 0 ? (
