@@ -324,7 +324,6 @@ export default function HomePage() {
         const rawKeywordText = [
           cvData.desiredPosition,
           cvData.pastPositions,
-          cvData.skills,
         ]
           .filter(Boolean)
           .join(", ")

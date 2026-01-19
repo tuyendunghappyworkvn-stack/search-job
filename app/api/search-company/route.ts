@@ -38,6 +38,7 @@ const PLATFORMS = [
   "amazon",
   "ebay",
   "tiktok",
+  "tiktokshop",
   "shopify",
   "facebook",
 ];
@@ -58,6 +59,8 @@ function hasAny(text: string, keywords: string[]) {
 }
 
 function extractPlatform(keyword: string) {
+  if (keyword.includes("tiktokshop")) return "tiktokshop";
+  if (keyword.includes("tiktok shop")) return "tiktokshop";
   return PLATFORMS.find((p) => keyword.includes(p)) || null;
 }
 
@@ -133,7 +136,20 @@ function matchJob(
 
   /* ===== SELLER + PLATFORM ===== */
   if (isSeller && platform) {
-    return cJob.includes(platform);
+    // seller tiktok ↔ seller tiktokshop (match chéo)
+    if (platform === "tiktok" || platform === "tiktokshop") {
+      return (
+        cJob.includes("seller") &&
+        (
+          cJob.includes("tiktok") ||
+          cJob.includes("tiktokshop") ||
+          cJob.includes("tiktok shop")
+        )
+      );
+    }
+
+    // các platform khác giữ nguyên logic cũ
+    return cJob.includes("seller") && cJob.includes(platform);
   }
 
   /* ===== SELLER POD ===== */
@@ -172,9 +188,10 @@ function matchJob(
   /* ===== DEFAULT ===== */
   if (!jobKeyword) return true;
 
-  return jobKeyword
-    .split(" ")
-    .some((k) => cJob.includes(k));
+  // nếu đã có keyword mà không match rule nào phía trên
+  // thì KHÔNG cho fallback linh tinh
+  return false;
+
 }
 
 /* =========================
